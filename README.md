@@ -1,396 +1,287 @@
-# Altium SchDoc Editor
+# KiCad 회로도 ↔ Python 코드 변환 도구
 
-A comprehensive Python library for parsing and editing Altium Designer schematic files (.SchDoc). Designed specifically for AI/LLM usage with intuitive, high-level APIs.
+KiCad 회로도 파일(.kicad_sch)과 Python 코드 간 양방향 변환을 지원하는 도구입니다.
+LLM을 활용한 회로도 분석 및 수정 워크플로우를 제공합니다.
 
-## Features
+## ✨ 주요 기능
 
-- **Complete SchDoc Parser**: Read and parse Altium schematic files into Python objects
-- **LLM-Friendly API**: Simple, intuitive methods designed for AI-assisted schematic editing
-- **Comprehensive Object Model**: Support for all major schematic elements:
-  - Components (with pins, designators, values)
-  - Wires and buses
-  - Net labels and power ports
-  - Junctions
-  - Graphical elements (lines, rectangles, polygons, arcs, etc.)
-  - Parameters and text labels
-- **High-Level Editor**: Easy-to-use API for creating and modifying schematics
-- **Tested**: Validated with real Altium schematic files
+- 🔄 **양방향 변환**: KiCad ↔ Python 코드
+  - ✅ Components (100% 보존)
+  - ✅ Wires (100% 보존)
+  - ✅ Junctions (100% 보존)
+  - ✅ Labels (97.4% 보존, 빈 라벨 제외)
+- 🤖 **LLM 통합**: Python 코드로 변환하여 LLM 분석 가능
+- 📝 **자동 코드 생성**: 회로도를 readable한 Python 코드로
+- 🔧 **MCP 서버**: AI 에이전트가 직접 회로도 조작 가능
+- ✅ **Round-trip 검증**: DI.kicad_sch (12,043 lines) 테스트 완료
+  - 29 components, 202 wires, 58 junctions, 38 labels
+  - 99.7% 요소 보존 (327/328 요소)
 
-## Installation
+## 📦 설치
 
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install olefile
+```powershell
+# 필요한 패키지 설치
+pip install -r requirements.txt
 ```
 
-## Quick Start
+**설치되는 패키지:**
+- `olefile` - Altium 파일 파싱용
+- `kicad-sch-api` - KiCad 회로도 API
+- `mcp-kicad-sch-api` - MCP 서버
+- `sexpdata` - S-expression 파서
 
-### Parsing an Existing Schematic
+## 🚀 빠른 시작
+
+### 1. KiCad → Python 코드
+
+```powershell
+python kicad_to_code.py input.kicad_sch output.py
+```
+
+### 2. Python 코드 → KiCad
+
+```powershell
+python code_to_kicad.py circuit_code.py output.kicad_sch
+```
+
+### 3. 테스트 예제
+
+```powershell
+# 간단한 LED 회로 생성
+python simple_example.py
+
+# 변환 테스트
+python kicad_to_code.py simple_led_circuit.kicad_sch test.py
+python code_to_kicad.py test.py roundtrip.kicad_sch
+```
+
+## 📖 사용 예제
+
+### 예제 1: 기본 변환
+
+```powershell
+# DI.kicad_sch를 Python 코드로 변환
+python kicad_to_code.py ./altium2kicad/DI.kicad_sch circuit.py
+
+# 생성된 circuit.py 확인
+# - 컴포넌트 목록
+# - 위치 정보
+# - lib_id, reference, value, footprint 등
+```
+
+### 예제 2: LLM 분석 워크플로우
+
+1. **변환**: KiCad → Python
+   ```powershell
+   python kicad_to_code.py my_circuit.kicad_sch circuit.py
+   ```
+
+2. **분석**: circuit.py를 LLM에 제공
+   - "이 회로의 주요 컴포넌트는?"
+   - "전원 회로 부분을 분석해줘"
+   - "개선할 수 있는 부분은?"
+
+3. **수정**: LLM이 수정한 코드를 modified.py로 저장
+
+4. **Export**: Python → KiCad
+   ```powershell
+   python code_to_kicad.py modified.py output.kicad_sch
+   ```
+
+### 예제 3: 생성된 Python 코드 구조
 
 ```python
-from altium_parser import AltiumParser
+import kicad_sch_api as ksa
 
-# Parse a SchDoc file
-parser = AltiumParser()
-doc = parser.parse_file("schematic.SchDoc")
+def create_schematic():
+    """회로도 생성"""
+    
+    # Create schematic
+    sch = ksa.create_schematic("Converted Circuit")
+    
+    # Add components
+    # R1: 220R
+    r1 = sch.components.add(
+        lib_id="Device:R",
+        reference="R1",
+        value="220R",
+        position=(100.33, 100.33)
+    )
 
-# Access schematic contents
-print(f"Components: {len(doc.get_components())}")
-print(f"Wires: {len(doc.get_wires())}")
-print(f"Net Labels: {len(doc.get_net_labels())}")
+    # LED1: RED
+    led1 = sch.components.add(
+        lib_id="Device:LED",
+        reference="LED1",
+        value="RED",
+        position=(119.38, 100.33)
+    )
+    
+    return sch
 
-# Examine components
-for comp in doc.get_components():
-    print(f"Component: {comp.library_reference} at ({comp.location_x}, {comp.location_y})")
+if __name__ == "__main__":
+    schematic = create_schematic()
+    schematic.save("output_circuit.kicad_sch")
 ```
 
-### Using the High-Level Editor
+## 🔧 MCP 서버 설정
 
-```python
-from altium_editor import SchematicEditor
-from altium_objects import Orientation, PowerPortStyle
+### Claude Desktop
 
-# Create new schematic
-editor = SchematicEditor()
-editor.new()
+`claude_desktop_config.json`에 추가:
 
-# Add components
-u1 = editor.add_component("LM358", x=1000, y=2000, designator="U1")
-r1 = editor.add_resistor(x=1500, y=2500, value="10k", designator="R1")
-c1 = editor.add_capacitor(x=2000, y=2500, value="100nF", designator="C1")
-
-# Add connections
-wire1 = editor.add_wire([(1000, 2000), (1500, 2000)])
-wire2 = editor.add_wire([(1500, 2000), (1500, 2500)])
-
-# Add junction at wire intersection
-junction = editor.add_junction(1500, 2000)
-
-# Add power ports
-gnd = editor.add_power_port(1000, 1500, "GND", PowerPortStyle.POWER_GROUND)
-vcc = editor.add_power_port(2000, 3000, "VCC", PowerPortStyle.ARROW)
-
-# Add net label
-label = editor.add_net_label(1500, 2100, "SIGNAL")
-
-# Save schematic
-editor.save("new_schematic.SchDoc")
+```json
+{
+  "mcpServers": {
+    "kicad-sch-api": {
+      "command": "python",
+      "args": ["-m", "mcp_kicad_sch_api"],
+      "env": {}
+    }
+  }
+}
 ```
 
-### Modifying an Existing Schematic
+### 사용 가능한 MCP 도구
 
-```python
-from altium_editor import SchematicEditor
+1. `create_schematic` - 새 회로도 생성
+2. `add_component` - 컴포넌트 추가
+3. `search_components` - KiCad 심볼 검색
+4. `add_wire` - 와이어 연결
+5. `list_components` - 컴포넌트 목록
+6. `get_schematic_info` - 회로도 정보
 
-# Load existing schematic
-editor = SchematicEditor()
-editor.load("existing.SchDoc")
+## 📂 프로젝트 구조
 
-# Add new components
-new_comp = editor.add_component("74HC595", x=3000, y=2000, designator="U5")
-
-# Add wire to connect it
-editor.add_wire([(3000, 2000), (3500, 2000)])
-
-# Save modified schematic
-editor.save("modified.SchDoc")
+```
+altium_schdoc_editor/
+├── kicad_to_code.py          # KiCad → Python 변환기
+├── code_to_kicad.py          # Python → KiCad 변환기
+├── simple_example.py         # 간단한 LED 회로 예제
+├── requirements.txt          # 패키지 의존성
+├── WORKFLOW_README.md        # 상세 워크플로우 가이드
+├── README.md                 # 이 파일
+└── altium2kicad/
+    └── DI.kicad_sch         # 테스트용 회로도 파일
 ```
 
-## API Reference
+## 🎯 주요 파일 설명
 
-### SchematicEditor
+### kicad_to_code.py
+- KiCad 회로도를 Python 코드로 변환
+- S-expression 파서 사용
+- 컴포넌트, 와이어, 라벨 추출
 
-The main high-level API for creating and modifying schematics.
+### code_to_kicad.py
+- Python 코드를 실행하여 KiCad 파일 생성
+- kicad-sch-api 사용
+- 자동으로 reference 번호 할당
 
-#### File Operations
+### simple_example.py
+- 간단한 LED 회로 생성 예제
+- 워크플로우 테스트용
+- 학습 자료
 
-- `new()`: Create a new blank schematic
-- `load(filename)`: Load an existing SchDoc file
-- `save(filename)`: Save the schematic to a file
+## 🔄 워크플로우 다이어그램
 
-#### Component Operations
-
-- `add_component(library_ref, x, y, designator, orientation=Orientation.RIGHT, description="")`: Add a component
-- `add_resistor(x, y, value="10k", designator="R?", orientation=Orientation.RIGHT)`: Add a resistor
-- `add_capacitor(x, y, value="10uF", designator="C?", orientation=Orientation.RIGHT)`: Add a capacitor
-- `find_component(designator)`: Find a component by designator
-- `remove_component(component)`: Remove a component
-
-#### Wire and Connection Operations
-
-- `add_wire(points, color=0x000000, line_width=1)`: Add a wire with list of (x, y) points
-- `add_junction(x, y, color=0x000000)`: Add a junction dot
-- `add_net_label(x, y, text, orientation=Orientation.RIGHT)`: Add a net label
-- `add_power_port(x, y, text="GND", style=PowerPortStyle.POWER_GROUND, orientation=Orientation.DOWN)`: Add a power port
-- `connect_points(point1, point2, add_junction=False)`: Connect two points with a wire
-
-#### Graphical Operations
-
-- `add_line(x1, y1, x2, y2, color=0x000000, line_width=1)`: Add a line
-- `add_rectangle(x1, y1, x2, y2, color=0x000000, fill_color=None, is_solid=False)`: Add a rectangle
-- `add_label(x, y, text, orientation=Orientation.RIGHT, color=0x000000)`: Add a text label
-
-#### Query Operations
-
-- `get_components()`: Get all components
-- `get_wires()`: Get all wires
-- `get_net_labels()`: Get all net labels
-- `get_power_ports()`: Get all power ports
-- `get_component_by_designator(designator)`: Find component by designator
-- `print_summary()`: Print a summary of schematic contents
-
-### Object Model
-
-All schematic objects inherit from `AltiumObject` and have clear, descriptive properties.
-
-#### Component
-
-- `library_reference`: Component library reference (e.g., "LM358")
-- `location_x`, `location_y`: Position in 1/100 inch units
-- `orientation`: Orientation (Orientation.RIGHT, UP, LEFT, DOWN)
-- `children`: List of child objects (pins, designators, etc.)
-
-#### Wire
-
-- `points`: List of (x, y) coordinate tuples
-- `color`: RGB color integer
-- `line_width`: Line width
-
-#### Pin
-
-- `location_x`, `location_y`: Position relative to component
-- `name`: Pin name
-- `designator`: Pin number
-- `electrical`: Electrical type (PinElectrical.INPUT, OUTPUT, PASSIVE, etc.)
-- `orientation`: Pin orientation
-- `length`: Pin length
-
-#### NetLabel
-
-- `location_x`, `location_y`: Position
-- `text`: Label text
-- `orientation`: Text orientation
-
-#### PowerPort
-
-- `location_x`, `location_y`: Position
-- `text`: Port name (e.g., "VCC", "GND")
-- `style`: Symbol style (PowerPortStyle.POWER_GROUND, ARROW, BAR, WAVE, etc.)
-- `orientation`: Port orientation
-
-## Coordinate System
-
-- Coordinates are in **1/100 inch units** (also known as mils/100)
-- Origin is at bottom-left
-- To convert to millimeters: `mm = mils * 0.254`
-- To convert from millimeters: `mils = mm / 0.254`
-
-Helper functions are provided:
-```python
-from altium_objects import mils_to_mm, mm_to_mils
-
-mm_value = mils_to_mm(1000)  # 254 mm
-mils_value = mm_to_mils(25.4)  # 100 mils
+```
+┌─────────────┐
+│ .kicad_sch  │ ─┐
+└─────────────┘  │ kicad_to_code.py
+                 ▼
+┌─────────────┐
+│ circuit.py  │ ─┐
+└─────────────┘  │ LLM 분석
+                 ▼
+┌─────────────┐
+│ modified.py │ ─┐
+└─────────────┘  │ code_to_kicad.py
+                 ▼
+┌─────────────┐
+│ output.     │
+│ kicad_sch   │
+└─────────────┘
 ```
 
-## Colors
+## ⚠️ 알려진 제한사항
 
-Colors are stored as RGB integers:
-```python
-from altium_objects import color_to_rgb, rgb_to_color
+1. **커스텀 라이브러리**: HoneyPot 등 커스텀 라이브러리는 지원 안 됨
+   - 해결: `convert_to_device_lib.py`로 표준 라이브러리 변환
 
-# Convert color integer to RGB tuple
-r, g, b = color_to_rgb(0xFF0000)  # (255, 0, 0) - Red
+2. **중복 Reference**: 동일한 reference는 자동으로 번호 추가
+   - 예: #PWR1 → #PWR1, #PWR1_1, #PWR1_2...
+   - 주석에 원본 reference 기록
 
-# Convert RGB to color integer
-color = rgb_to_color(0, 255, 0)  # 0x00FF00 - Green
+3. **빈 라벨**: KiCad API 제약으로 빈 라벨 제외됨 (영향 극소)
+
+4. **lib_symbols**: Custom 라이브러리 심볼 정의는 아직 추출되지 않음
+
+## 📊 테스트 결과
+
+### Simple LED Circuit
+- ✅ 2 components
+- ✅ 4 wires
+- ✅ Round-trip 100% 성공
+
+### DI.kicad_sch (복잡한 회로)
+- ✅ 29 components
+- ✅ 202 wires
+- ✅ 58 junctions
+- ✅ 38 labels (빈 라벨 1개 제외)
+- ✅ Round-trip 99.7% 성공 (327/328 요소)
+
+자세한 내용은 [ROUNDTRIP_TEST_RESULTS.md](ROUNDTRIP_TEST_RESULTS.md) 참조
+
+## 🐛 문제 해결
+
+### "kicad-sch-api를 찾을 수 없음"
+```powershell
+pip install kicad-sch-api
 ```
 
-Common colors:
-- `0x000000` - Black
-- `0xFFFFFF` - White
-- `0xFF0000` - Red
-- `0x00FF00` - Green
-- `0x0000FF` - Blue
-
-## Enumerations
-
-### Orientation
-- `Orientation.RIGHT` (0°)
-- `Orientation.UP` (90°)
-- `Orientation.LEFT` (180°)
-- `Orientation.DOWN` (270°)
-
-### PowerPortStyle
-- `PowerPortStyle.ARROW`
-- `PowerPortStyle.BAR`
-- `PowerPortStyle.WAVE`
-- `PowerPortStyle.POWER_GROUND`
-- `PowerPortStyle.SIGNAL_GROUND`
-- `PowerPortStyle.EARTH`
-
-### PinElectrical
-- `PinElectrical.INPUT`
-- `PinElectrical.OUTPUT`
-- `PinElectrical.IO`
-- `PinElectrical.PASSIVE`
-- `PinElectrical.POWER`
-- `PinElectrical.OPEN_COLLECTOR`
-- `PinElectrical.OPEN_EMITTER`
-- `PinElectrical.HI_Z`
-
-## File Format
-
-Altium SchDoc files are OLE Compound Documents containing:
-- **FileHeader stream**: Main schematic data (records in pipe-delimited format)
-- **Storage stream**: Embedded images/icons
-- **Additional stream** (optional): Supplementary data
-
-Each record has:
-- 2-byte length (little-endian)
-- 1 zero byte
-- 1 type byte (always 0 for property lists)
-- Property data: `|NAME=value|NAME=value|...`
-
-## Testing
-
-Run the comprehensive test suite:
-
-```bash
-python test_parser.py
+### "sexpdata를 찾을 수 없음"
+```powershell
+pip install sexpdata
 ```
 
-Tests include:
-- Parsing DI.SchDoc example file
-- Round-trip integrity (parse → serialize → parse)
-- High-level editor operations
-- Modifying existing schematics
-- Query operations
+### "Symbol not found in KiCAD libraries"
+- 표준 KiCad 라이브러리의 심볼로 변경
+- 또는 커스텀 라이브러리 경로 설정
 
-## Examples
+### KiCad 라이브러리 경로 설정
+```powershell
+# Windows
+$env:KICAD_SYMBOL_DIR = "C:\Program Files\KiCad\share\kicad\symbols"
 
-### Example 1: Analyze a Schematic
-
-```python
-from altium_editor import SchematicEditor
-
-editor = SchematicEditor()
-editor.load("schematic.SchDoc")
-
-# Print summary
-editor.print_summary()
-
-# Find specific components
-for comp in editor.get_components():
-    # Get designator from children
-    designator = "?"
-    for child in comp.children:
-        if hasattr(child, 'name') and child.name == "Designator":
-            designator = child.text
-            break
-
-    print(f"{designator}: {comp.library_reference}")
-
-# List all nets
-for label in editor.get_net_labels():
-    print(f"Net: {label.text} at ({label.location_x}, {label.location_y})")
+# Linux/Mac
+export KICAD_SYMBOL_DIR=/usr/share/kicad/symbols
 ```
 
-### Example 2: Create a Simple Circuit
+## 📚 추가 문서
 
-```python
-from altium_editor import SchematicEditor
-from altium_objects import Orientation, PowerPortStyle
+- [WORKFLOW_README.md](WORKFLOW_README.md) - 상세한 워크플로우 가이드
+- [kicad-sch-api 문서](https://github.com/circuit-synth/kicad-sch-api)
+- [circuit-synth 문서](https://github.com/circuit-synth/circuit-synth)
 
-editor = SchematicEditor()
-editor.new()
+## 🤝 기여
 
-# Add resistor and capacitor
-r1 = editor.add_resistor(1000, 2000, "10k", "R1", Orientation.RIGHT)
-c1 = editor.add_capacitor(2000, 2000, "100nF", "C1", Orientation.RIGHT)
+기여는 언제나 환영합니다!
 
-# Connect them
-editor.add_wire([(1100, 2000), (2000, 2000)])
-editor.add_junction(2000, 2000)
+1. Fork the project
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
-# Add ground
-editor.add_power_port(2000, 1800, "GND", PowerPortStyle.POWER_GROUND, Orientation.DOWN)
-editor.add_wire([(2000, 1800), (2000, 2000)])
+## 📄 라이센스
 
-# Add labels
-editor.add_net_label(1500, 2100, "INPUT")
+MIT License - 자유롭게 사용 가능
 
-editor.save("simple_circuit.SchDoc")
-```
+## 🙏 감사
 
-### Example 3: Batch Modify Components
-
-```python
-from altium_editor import SchematicEditor
-
-editor = SchematicEditor()
-editor.load("schematic.SchDoc")
-
-# Find all resistors and move them
-for comp in editor.get_components():
-    if "RES" in comp.library_reference:
-        # Move down by 100 units
-        comp.location_y -= 100
-
-editor.save("modified_schematic.SchDoc")
-```
-
-## Design Philosophy for LLM Usage
-
-This library is designed to be easily understood and used by Large Language Models:
-
-1. **Clear Naming**: Property names are descriptive and intuitive
-2. **Type Hints**: All functions have clear type hints
-3. **Simple Data Structures**: Uses standard Python types (lists, dicts, dataclasses)
-4. **High-Level API**: Common operations have dedicated methods
-5. **Comprehensive Documentation**: Docstrings on all public methods
-6. **Examples**: Numerous examples for common tasks
-
-## Limitations
-
-- **OLE File Creation**: Creating new OLE files from scratch is complex. The library uses template-based approaches for best results.
-- **Round-Trip Fidelity**: When parsing and re-serializing files, some formatting differences may occur (though all data is preserved).
-- **Mini Streams**: Small embedded files (<4KB) use OLE mini streams which have limited support in the current writer.
-- **Image Support**: Embedded images in the Storage stream are not yet fully supported.
-
-## Contributing
-
-This project is designed for use with Claude Code and other AI assistants. The codebase is well-documented and structured for easy understanding and modification.
-
-Key files:
-- `altium_objects.py`: Data structure definitions
-- `altium_parser.py`: Parser implementation
-- `altium_serializer.py`: Serializer implementation
-- `altium_editor.py`: High-level editor API
-- `ole_writer.py`: OLE file writer
-- `ole_patcher.py`: OLE file patcher for same-size modifications
-- `test_parser.py`: Comprehensive test suite
-
-## References
-
-This implementation is based on research from:
-- [gsuberland/altium_js](https://github.com/gsuberland/altium_js) - Primary reference
-- [vadmium/python-altium](https://github.com/vadmium/python-altium) - Format documentation
-- [pluots/PyAltium](https://github.com/pluots/PyAltium) - Python implementation reference
-
-## License
-
-This project is open source and available for use in AI-assisted development workflows.
-
-## Version
-
-Version: 1.0.0
-Last Updated: 2025-11-09
+- [kicad-sch-api](https://github.com/circuit-synth/kicad-sch-api) - KiCad 파일 처리
+- [circuit-synth](https://github.com/circuit-synth/circuit-synth) - 회로 설계 도구
+- [KiCad](https://www.kicad.org/) - 오픈소스 EDA 도구
 
 ---
 
-Created for use with Claude Code and AI-assisted schematic editing workflows.
+**Made with ❤️ for circuit design automation**

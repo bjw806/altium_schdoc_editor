@@ -1,1 +1,3 @@
 olefile
+kicad-sch-api
+mcp-kicad-sch-api
