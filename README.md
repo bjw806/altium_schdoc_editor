@@ -14,6 +14,7 @@ A comprehensive Python library for parsing and editing Altium Designer schematic
   - Graphical elements (lines, rectangles, polygons, arcs, etc.)
   - Parameters and text labels
 - **High-Level Editor**: Easy-to-use API for creating and modifying schematics
+- **Altium to KiCad Converter**: Convert Altium schematics to KiCad via SKiDL
 - **Tested**: Validated with real Altium schematic files
 
 ## Installation
@@ -24,8 +25,78 @@ python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install olefile
+pip install -r requirements.txt
 ```
+
+## Altium to KiCad Conversion
+
+Convert Altium SchDoc files to KiCad format via SKiDL (Python-based circuit description language).
+
+### Quick Conversion
+
+```bash
+# Convert Altium schematic to KiCad
+python3 convert_pipeline.py input.SchDoc
+```
+
+This will generate:
+- `input.py` - SKiDL Python code representing the circuit
+- `input.net` - KiCad netlist file
+- `input.kicad_pcb` - KiCad PCB file (if SKiDL is installed)
+
+### Conversion Pipeline
+
+The conversion follows these steps:
+
+1. **Parse Altium File** - Extract components, nets, and connections using `altium_parser.py`
+2. **Analyze Schematic** - Identify net connectivity by tracing wires and pin connections
+3. **Generate SKiDL Code** - Create Python code that describes the circuit
+4. **Execute SKiDL** - Run the generated code to produce KiCad files
+
+### Using the Converter Programmatically
+
+```python
+from altium_to_skidl import AltiumToSKiDLConverter
+
+# Create converter
+converter = AltiumToSKiDLConverter("input.SchDoc")
+
+# Run full conversion
+converter.convert(
+    skidl_output="circuit.py",
+    pcb_output="output.kicad_pcb",
+    netlist_output="output.net",
+    execute=True  # Set False to only generate SKiDL code
+)
+
+# Print analysis summary
+converter.print_analysis_summary()
+```
+
+### Understanding the Generated SKiDL Code
+
+The generated SKiDL Python file contains:
+- Net definitions (power, ground, signal nets)
+- Component definitions with part numbers and footprints
+- Connection specifications (which pins connect to which nets)
+
+You can edit this file to:
+- Fix part mappings
+- Update footprints
+- Modify net names
+- Add constraints
+
+Then re-run it to regenerate KiCad files:
+```bash
+python3 circuit.py
+```
+
+### Importing to Altium
+
+After generating KiCad files, you can import them back to Altium:
+1. Open KiCad and load the generated `.kicad_pcb` file
+2. Export from KiCad in a format Altium supports (e.g., IPC netlist)
+3. Import into Altium Designer
 
 ## Quick Start
 
