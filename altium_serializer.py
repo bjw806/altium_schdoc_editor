@@ -187,13 +187,25 @@ class AltiumSerializer:
         This is the most reliable approach - keep the OLE structure intact
         and only modify the stream data sectors.
         """
-        import shutil
+        from ole_template_patcher import patch_ole_file_simple, verify_ole_file
 
-        # For very large files, we should rebuild the OLE structure
-        # For now, just use the minimal OLE creator
-        # TODO: Implement proper OLE patching that supports size changes
+        # Try template-based patching first
+        try:
+            # Use original file as template
+            template = filename if os.path.exists(filename) else "DI.SchDoc"
 
-        print(f"Note: Creating new OLE file from scratch (template patching not yet supported)")
+            success = patch_ole_file_simple(template, filename, new_fileheader_data)
+
+            if success:
+                # Verify the output
+                if verify_ole_file(filename):
+                    print(f"✓ Template-based patching successful!")
+                    return
+        except Exception as e:
+            print(f"⚠ Template patching failed: {e}")
+
+        # Fallback to creating from scratch
+        print(f"→ Falling back to creating OLE from scratch...")
         self._create_minimal_ole(filename, new_fileheader_data)
 
     def _create_minimal_ole(self, filename: str, fileheader_data: bytes):
