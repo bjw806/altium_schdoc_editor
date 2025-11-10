@@ -1,0 +1,423 @@
+{
+  "file": "DI.SchDoc",
+  "total_issues": 52,
+  "total_suggestions": 2,
+  "tasks": [
+    {
+      "id": 1,
+      "type": "junction",
+      "description": "접속점 추가 at (510, 590)",
+      "x": "510",
+      "y": "590",
+      "completed": false
+    },
+    {
+      "id": 2,
+      "type": "junction",
+      "description": "접속점 추가 at (550, 590)",
+      "x": "550",
+      "y": "590",
+      "completed": false
+    },
+    {
+      "id": 3,
+      "type": "junction",
+      "description": "접속점 추가 at (470, 590)",
+      "x": "470",
+      "y": "590",
+      "completed": false
+    },
+    {
+      "id": 4,
+      "type": "junction",
+      "description": "접속점 추가 at (590, 690)",
+      "x": "590",
+      "y": "690",
+      "completed": false
+    },
+    {
+      "id": 5,
+      "type": "junction",
+      "description": "접속점 추가 at (550, 690)",
+      "x": "550",
+      "y": "690",
+      "completed": false
+    },
+    {
+      "id": 6,
+      "type": "junction",
+      "description": "접속점 추가 at (510, 690)",
+      "x": "510",
+      "y": "690",
+      "completed": false
+    },
+    {
+      "id": 7,
+      "type": "junction",
+      "description": "접속점 추가 at (470, 690)",
+      "x": "470",
+      "y": "690",
+      "completed": false
+    },
+    {
+      "id": 8,
+      "type": "junction",
+      "description": "접속점 추가 at (790, 690)",
+      "x": "790",
+      "y": "690",
+      "completed": false
+    },
+    {
+      "id": 9,
+      "type": "junction",
+      "description": "접속점 추가 at (750, 690)",
+      "x": "750",
+      "y": "690",
+      "completed": false
+    },
+    {
+      "id": 10,
+      "type": "junction",
+      "description": "접속점 추가 at (710, 690)",
+      "x": "710",
+      "y": "690",
+      "completed": false
+    },
+    {
+      "id": 11,
+      "type": "junction",
+      "description": "접속점 추가 at (830, 240)",
+      "x": "830",
+      "y": "240",
+      "completed": false
+    },
+    {
+      "id": 12,
+      "type": "junction",
+      "description": "접속점 추가 at (790, 240)",
+      "x": "790",
+      "y": "240",
+      "completed": false
+    },
+    {
+      "id": 13,
+      "type": "junction",
+      "description": "접속점 추가 at (750, 240)",
+      "x": "750",
+      "y": "240",
+      "completed": false
+    },
+    {
+      "id": 14,
+      "type": "junction",
+      "description": "접속점 추가 at (510, 140)",
+      "x": "510",
+      "y": "140",
+      "completed": false
+    },
+    {
+      "id": 15,
+      "type": "junction",
+      "description": "접속점 추가 at (550, 140)",
+      "x": "550",
+      "y": "140",
+      "completed": false
+    },
+    {
+      "id": 16,
+      "type": "junction",
+      "description": "접속점 추가 at (590, 140)",
+      "x": "590",
+      "y": "140",
+      "completed": false
+    },
+    {
+      "id": 17,
+      "type": "junction",
+      "description": "접속점 추가 at (710, 140)",
+      "x": "710",
+      "y": "140",
+      "completed": false
+    },
+    {
+      "id": 18,
+      "type": "junction",
+      "description": "접속점 추가 at (750, 140)",
+      "x": "750",
+      "y": "140",
+      "completed": false
+    },
+    {
+      "id": 19,
+      "type": "junction",
+      "description": "접속점 추가 at (790, 140)",
+      "x": "790",
+      "y": "140",
+      "completed": false
+    },
+    {
+      "id": 20,
+      "type": "junction",
+      "description": "접속점 추가 at (830, 140)",
+      "x": "830",
+      "y": "140",
+      "completed": false
+    },
+    {
+      "id": 21,
+      "type": "junction",
+      "description": "접속점 추가 at (420, 480)",
+      "x": "420",
+      "y": "480",
+      "completed": false
+    },
+    {
+      "id": 22,
+      "type": "junction",
+      "description": "접속점 추가 at (450, 480)",
+      "x": "450",
+      "y": "480",
+      "completed": false
+    },
+    {
+      "id": 23,
+      "type": "junction",
+      "description": "접속점 추가 at (450, 470)",
+      "x": "450",
+      "y": "470",
+      "completed": false
+    },
+    {
+      "id": 24,
+      "type": "junction",
+      "description": "접속점 추가 at (590, 590)",
+      "x": "590",
+      "y": "590",
+      "completed": false
+    },
+    {
+      "id": 25,
+      "type": "junction",
+      "description": "접속점 추가 at (630, 450)",
+      "x": "630",
+      "y": "450",
+      "completed": false
+    },
+    {
+      "id": 26,
+      "type": "junction",
+      "description": "접속점 추가 at (660, 450)",
+      "x": "660",
+      "y": "450",
+      "completed": false
+    },
+    {
+      "id": 27,
+      "type": "junction",
+      "description": "접속점 추가 at (690, 450)",
+      "x": "690",
+      "y": "450",
+      "completed": false
+    },
+    {
+      "id": 28,
+      "type": "junction",
+      "description": "접속점 추가 at (710, 590)",
+      "x": "710",
+      "y": "590",
+      "completed": false
+    },
+    {
+      "id": 29,
+      "type": "junction",
+      "description": "접속점 추가 at (660, 440)",
+      "x": "660",
+      "y": "440",
+      "completed": false
+    },
+    {
+      "id": 30,
+      "type": "junction",
+      "description": "접속점 추가 at (690, 440)",
+      "x": "690",
+      "y": "440",
+      "completed": false
+    },
+    {
+      "id": 31,
+      "type": "junction",
+      "description": "접속점 추가 at (750, 590)",
+      "x": "750",
+      "y": "590",
+      "completed": false
+    },
+    {
+      "id": 32,
+      "type": "junction",
+      "description": "접속점 추가 at (690, 430)",
+      "x": "690",
+      "y": "430",
+      "completed": false
+    },
+    {
+      "id": 33,
+      "type": "junction",
+      "description": "접속점 추가 at (790, 590)",
+      "x": "790",
+      "y": "590",
+      "completed": false
+    },
+    {
+      "id": 34,
+      "type": "junction",
+      "description": "접속점 추가 at (390, 490)",
+      "x": "390",
+      "y": "490",
+      "completed": false
+    },
+    {
+      "id": 35,
+      "type": "junction",
+      "description": "접속점 추가 at (420, 490)",
+      "x": "420",
+      "y": "490",
+      "completed": false
+    },
+    {
+      "id": 36,
+      "type": "junction",
+      "description": "접속점 추가 at (450, 490)",
+      "x": "450",
+      "y": "490",
+      "completed": false
+    },
+    {
+      "id": 37,
+      "type": "junction",
+      "description": "접속점 추가 at (690, 380)",
+      "x": "690",
+      "y": "380",
+      "completed": false
+    },
+    {
+      "id": 38,
+      "type": "junction",
+      "description": "접속점 추가 at (660, 370)",
+      "x": "660",
+      "y": "370",
+      "completed": false
+    },
+    {
+      "id": 39,
+      "type": "junction",
+      "description": "접속점 추가 at (690, 370)",
+      "x": "690",
+      "y": "370",
+      "completed": false
+    },
+    {
+      "id": 40,
+      "type": "junction",
+      "description": "접속점 추가 at (630, 360)",
+      "x": "630",
+      "y": "360",
+      "completed": false
+    },
+    {
+      "id": 41,
+      "type": "junction",
+      "description": "접속점 추가 at (660, 360)",
+      "x": "660",
+      "y": "360",
+      "completed": false
+    },
+    {
+      "id": 42,
+      "type": "junction",
+      "description": "접속점 추가 at (690, 360)",
+      "x": "690",
+      "y": "360",
+      "completed": false
+    },
+    {
+      "id": 43,
+      "type": "junction",
+      "description": "접속점 추가 at (710, 240)",
+      "x": "710",
+      "y": "240",
+      "completed": false
+    },
+    {
+      "id": 44,
+      "type": "junction",
+      "description": "접속점 추가 at (590, 240)",
+      "x": "590",
+      "y": "240",
+      "completed": false
+    },
+    {
+      "id": 45,
+      "type": "junction",
+      "description": "접속점 추가 at (450, 340)",
+      "x": "450",
+      "y": "340",
+      "completed": false
+    },
+    {
+      "id": 46,
+      "type": "junction",
+      "description": "접속점 추가 at (550, 240)",
+      "x": "550",
+      "y": "240",
+      "completed": false
+    },
+    {
+      "id": 47,
+      "type": "junction",
+      "description": "접속점 추가 at (420, 330)",
+      "x": "420",
+      "y": "330",
+      "completed": false
+    },
+    {
+      "id": 48,
+      "type": "junction",
+      "description": "접속점 추가 at (450, 330)",
+      "x": "450",
+      "y": "330",
+      "completed": false
+    },
+    {
+      "id": 49,
+      "type": "junction",
+      "description": "접속점 추가 at (510, 240)",
+      "x": "510",
+      "y": "240",
+      "completed": false
+    },
+    {
+      "id": 50,
+      "type": "junction",
+      "description": "접속점 추가 at (390, 320)",
+      "x": "390",
+      "y": "320",
+      "completed": false
+    },
+    {
+      "id": 51,
+      "type": "junction",
+      "description": "접속점 추가 at (420, 320)",
+      "x": "420",
+      "y": "320",
+      "completed": false
+    },
+    {
+      "id": 52,
+      "type": "junction",
+      "description": "접속점 추가 at (450, 320)",
+      "x": "450",
+      "y": "320",
+      "completed": false
+    }
+  ]
+}
