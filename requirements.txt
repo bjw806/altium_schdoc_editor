@@ -1,1 +1,3 @@
 olefile
+skidl
+kinet2pcb

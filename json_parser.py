@@ -1,4 +1,5 @@
-import argparse, textwrap
+import argparse
+import textwrap
 import olefile
 import re
 import json
@@ -64,14 +65,14 @@ def determine_hierarchy(schematic):
     # loop through all "records" and organize them into owner/children
     for i, current in enumerate(records_copy):
         current['index'] = i
-        s = current.get("OWNERINDEX")
-        if (s is None):
+        s = current.get("OWNERINDEX", current.get("OwnerIndex"))
+        if s is None:
             schematic["hierarchy"].append(current)
         else:
             ownerIndex = int(s)
 
             owner = records_copy[ownerIndex]
-            if (owner.get("children") == None):
+            if owner.get("children") is None:
                 owner["children"] = []
 
             owner["children"].append(current)
@@ -93,11 +94,25 @@ def determine_net_list(schematic):
     _, power_ports = find_record(schematic, key="RECORD", value="17")
     devices = wires + pins + labels + power_ports
 
+    # Normalise keys for easier downstream access.
+    for device in devices:
+        for key in list(device.keys()):
+            if key == "children":
+                continue
+            value = device[key]
+            upper = key.upper()
+            if upper not in device:
+                device[upper] = value
+            alias = key.replace('.', '_').upper()
+            if alias not in device:
+                device[alias] = value
+
     p = re.compile('^(?P<prefix>X)(?P<index>\\d+)$')
     for device in devices:
         # if a Pin, do some fancy geometry math
         if device["RECORD"] == "2":
-            rotation = (int(device["PINCONGLOMERATE"]) & 0x03) * 90
+            pin_cong = device.get("PINCONGLOMERATE") or device.get("PIN_CONGLOMERATE") or 0
+            rotation = (int(pin_cong) & 0x03) * 90
             device['coords'] = [[
                 int(int(device['LOCATION.X']) + math.cos(rotation / 180 * math.pi) * int(device['PINLENGTH'])),
                 int(int(device['LOCATION.Y']) + math.sin(rotation / 180 * math.pi) * int(device['PINLENGTH']))
@@ -121,12 +136,19 @@ def determine_net_list(schematic):
     for net in nets:
         net['devices'].sort(key=lambda k: k['index'])
         if not net['name']:
-            net['name'] = next(iter(d['TEXT'] for d in net['devices'] if ((d['RECORD'] == '17') or (d['RECORD'] == '25'))), None)
+            net['name'] = next(
+                (d.get('TEXT') for d in net['devices'] if ((d.get('RECORD') == '17') or (d.get('RECORD') == '25')) and d.get('TEXT')),
+                None,
+            )
 
         if not net['name']:
             naming_pin = next(iter(d for d in net['devices'] if d['RECORD'] == '2'), None)
             parent = next(iter(find_record(schematic, key="index", value=int(naming_pin['OWNERINDEX']))[1]), None) if naming_pin else None
-            net['name'] = next(iter('Net' + r['TEXT'] for r in parent['children'] if (r['RECORD'] == '34')), None) if parent else None
+            children = parent.get('children', []) if parent else []
+            net['name'] = next(
+                (('Net' + r.get('TEXT')) for r in children if (r.get('RECORD') == '34') and r.get('TEXT')),
+                None,
+            ) if children else None
 
     schematic["nets"] = nets
 
@@ -135,11 +157,11 @@ def determine_net_list(schematic):
 def find_record(schematic, key, value, record=None, visited=None, found=None):
     lg.debug("finding records where: {0} = {1}".format(key, value))
 
-    if visited == None:
+    if visited is None:
         visited = []
-    if found == None:
+    if found is None:
         found = []
-    if record == None:
+    if record is None:
         for record in schematic['records']:
             visited, found = find_record(schematic, key, value, record=record, visited=visited, found=found)
     else:
