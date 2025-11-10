@@ -13,6 +13,9 @@ from typing import Any
 import sexpdata
 
 
+COMPONENT_VAR_COUNTER: dict[str, int] = {}
+
+
 def parse_position(pos_data):
     """위치 데이터 파싱"""
     if isinstance(pos_data, list) and len(pos_data) >= 3:
@@ -182,6 +185,21 @@ def extract_labels_from_sexp(sexp_data):
     return labels
 
 
+def extract_lib_symbols_sexp(sexp_data):
+    """lib_symbols 블록을 S-expression 문자열로 추출"""
+    if not isinstance(sexp_data, list):
+        return None
+
+    for item in sexp_data:
+        if isinstance(item, list) and item:
+            head = item[0]
+            if isinstance(head, sexpdata.Symbol) and str(head) == 'lib_symbols':
+                # pretty_print 옵션으로 원본 구조에 가깝게 보존
+                return sexpdata.dumps(item, pretty_print=True, indent_as='    ')
+
+    return None
+
+
 def generate_component_code(comp: dict) -> str:
     """컴포넌트를 Python 코드로 변환"""
     lib_id = comp.get('lib_id', 'Device:Unknown')
@@ -199,16 +217,15 @@ def generate_component_code(comp: dict) -> str:
     # 변수명 생성 (Python 변수명으로 valid하게)
     # #PWR1 → pwr_pwr1, #PWR1 (중복) → pwr_pwr1_1, pwr_pwr1_2 등으로 변환
     var_name = reference.lower().replace('#', 'pwr_').replace('?', 'x').replace('-', '_')
-    
+
     # 변수명 중복 처리를 위한 카운터 (전역 변수 사용)
-    if not hasattr(generate_component_code, 'var_counter'):
-        generate_component_code.var_counter = {}
-    
-    if var_name in generate_component_code.var_counter:
-        generate_component_code.var_counter[var_name] += 1
-        unique_var_name = f"{var_name}_{generate_component_code.var_counter[var_name]}"
+    count = COMPONENT_VAR_COUNTER.get(var_name)
+    if count is not None:
+        count += 1
+        COMPONENT_VAR_COUNTER[var_name] = count
+        unique_var_name = f"{var_name}_{count}"
     else:
-        generate_component_code.var_counter[var_name] = 0
+        COMPONENT_VAR_COUNTER[var_name] = 0
         unique_var_name = var_name
     
     code = f'    # {reference}: {value}\n'
@@ -263,6 +280,9 @@ def convert_kicad_to_code(input_file: str, output_file: str):
     
     print("Parsing S-expression data...")
     sexp_data = sexpdata.loads(content)
+
+    # lib_symbols 블록은 커스텀 심볼 복원을 위해 그대로 보존
+    lib_symbols_sexp = extract_lib_symbols_sexp(sexp_data)
     
     # 모든 요소 추출
     print("Extracting components...")
@@ -308,6 +328,7 @@ def convert_kicad_to_code(input_file: str, output_file: str):
     print(f"  Found {len(labels)} labels")
     
     # Python 코드 생성
+    COMPONENT_VAR_COUNTER.clear()
     code_lines = []
     code_lines.append('"""')
     code_lines.append(f'Generated from: {Path(input_file).name}')
@@ -323,6 +344,14 @@ def convert_kicad_to_code(input_file: str, output_file: str):
     code_lines.append('')
     code_lines.append('import kicad_sch_api as ksa')
     code_lines.append('')
+
+    if lib_symbols_sexp:
+        code_lines.append('# Original lib_symbols block for custom libraries')
+        code_lines.append('LIB_SYMBOLS_SEXP = """')
+        code_lines.extend(lib_symbols_sexp.splitlines())
+        code_lines.append('"""')
+        code_lines.append('')
+
     code_lines.append('')
     code_lines.append('def create_schematic():')
     code_lines.append('    """회로도 생성"""')
