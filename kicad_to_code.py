@@ -41,13 +41,36 @@ def extract_components_from_sexp(sexp_data):
                                 comp_data['lib_id'] = lib_id
                             elif key == 'at':
                                 comp_data['position'] = parse_position(item)
+                            elif key == 'unit':
+                                comp_data['unit'] = int(item[1]) if len(item) > 1 else 1
+                            elif key == 'mirror':
+                                # mirror x or mirror y
+                                comp_data['mirror'] = str(item[1]) if len(item) > 1 else None
+                            elif key == 'exclude_from_sim':
+                                comp_data['exclude_from_sim'] = str(item[1]) == 'no'
+                            elif key == 'in_bom':
+                                comp_data['in_bom'] = str(item[1]) == 'yes'
+                            elif key == 'on_board':
+                                comp_data['on_board'] = str(item[1]) == 'yes'
+                            elif key == 'dnp':
+                                comp_data['dnp'] = str(item[1]) == 'yes'
                             elif key == 'property':
                                 prop_name = str(item[1])
                                 prop_value = str(item[2]) if len(item) > 2 else ""
                                 if prop_name == 'Reference':
                                     comp_data['reference'] = prop_value
+                                    # Reference property의 위치와 각도도 저장
+                                    for prop_item in item[3:]:
+                                        if isinstance(prop_item, list) and len(prop_item) > 0:
+                                            if str(prop_item[0]) == 'at':
+                                                comp_data['reference_at'] = parse_position(prop_item)
                                 elif prop_name == 'Value':
                                     comp_data['value'] = prop_value
+                                    # Value property의 위치와 각도도 저장
+                                    for prop_item in item[3:]:
+                                        if isinstance(prop_item, list) and len(prop_item) > 0:
+                                            if str(prop_item[0]) == 'at':
+                                                comp_data['value_at'] = parse_position(prop_item)
                                 elif prop_name == 'Footprint':
                                     comp_data['footprint'] = prop_value
                     
@@ -326,8 +349,10 @@ def convert_kicad_to_code(input_file: str, output_file: str):
             reference = component.get('reference', 'REF?')
             original_ref = component.get('original_reference', reference)
             value = component.get('value', '')
-            position = component.get('position', (0.0, 0.0))
+            position = component.get('position', (0.0, 0.0, 0.0))
             footprint = component.get('footprint', '')
+            unit = component.get('unit', 1)
+            mirror = component.get('mirror', None)
             
             # 원본 reference가 다르면 주석에 표시
             if original_ref != reference:
@@ -335,15 +360,26 @@ def convert_kicad_to_code(input_file: str, output_file: str):
             else:
                 code_lines.append(f'    # {reference}: {value}')
             
+            # position이 (x, y) 또는 (x, y, angle) 형식일 수 있음
+            if len(position) == 2:
+                position = (position[0], position[1], 0.0)
+            
             code_lines.append(f'    {var_name} = sch.components.add(')
             code_lines.append(f'        lib_id="{lib_id}",')
             code_lines.append(f'        reference="{reference}",')
             code_lines.append(f'        value="{value}",')
+            code_lines.append(f'        position=({position[0]:.4f}, {position[1]:.4f}),')
+            code_lines.append(f'        angle={position[2]:.1f},')
+            code_lines.append(f'        unit={unit},')
+            if mirror:
+                code_lines.append(f'        mirror="{mirror}",')
             if footprint:
-                code_lines.append(f'        position=({position[0]:.2f}, {position[1]:.2f}),')
                 code_lines.append(f'        footprint="{footprint}"')
             else:
-                code_lines.append(f'        position=({position[0]:.2f}, {position[1]:.2f})')
+                # 마지막 파라미터 뒤에 comma 제거
+                last_line = code_lines[-1]
+                if last_line.endswith(','):
+                    code_lines[-1] = last_line[:-1]
             code_lines.append('    )')
             code_lines.append('')
     
