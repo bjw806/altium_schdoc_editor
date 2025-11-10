@@ -108,7 +108,8 @@ def main() -> None:
     load_env_vars()
 
     import skidl
-    from skidl import ERC, generate_netlist, generate_pcb, reset, set_default_tool
+    from skidl import ERC, reset, set_default_tool
+    from skidl.logger import active_logger
 
     default_tool = getattr(skidl, "KICAD8", getattr(skidl, "KICAD", None))
 
@@ -135,13 +136,29 @@ def main() -> None:
 
     if default_tool is not None:
         set_default_tool(default_tool)
+
+    active_tool = default_tool or skidl.config.tool
+
+    def _suppress_empty_footprint(part):
+        active_logger.warning(f"No footprint assigned to {part.ref} ({part.name}).")
+
+    skidl.empty_footprint_handler = _suppress_empty_footprint
+
+    for part in circuit.parts:
+        part.tool = active_tool
+        if not getattr(part, "tag", None):
+            part.tag = part.ref
+    for net in circuit.nets:
+        if not getattr(net, "tag", None):
+            net.tag = net.name
+
     if not args.skip_erc:
         ERC()
     if netlist_path:
-        generate_netlist(file_=str(netlist_path))
+        circuit.generate_netlist(file_=str(netlist_path), tool=active_tool, do_backup=False)
     if pcb_path:
         try:
-            generate_pcb(file_=str(pcb_path))
+            circuit.generate_pcb(file_=str(pcb_path), tool=active_tool, do_backup=False)
         except Exception as exc:
             print(f"PCB export failed: {exc}")
 

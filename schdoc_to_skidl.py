@@ -182,7 +182,7 @@ def generate_part_metadata(components: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def collect_nets(net_entries: List[Dict[str, Any]], component_map: Dict[int, Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Extract net connectivity information."""
+    """Extract net connectivity information and merge duplicate entries."""
 
     nets: List[Dict[str, Any]] = []
 
@@ -222,6 +222,26 @@ def collect_nets(net_entries: List[Dict[str, Any]], component_map: Dict[int, Dic
             "connections": unique_connections,
         })
 
+    merged: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    for entry in nets:
+        key = entry["display_name"]
+        if key not in merged:
+            merged[key] = {
+                "raw_name": entry["raw_name"],
+                "display_name": key,
+                "connections": list(entry["connections"]),
+            }
+            order.append(key)
+            continue
+        existing = merged[key]
+        existing_conn = {tuple(conn) for conn in existing["connections"]}
+        existing_conn.update(entry["connections"])
+        existing["connections"] = sorted(existing_conn)
+        if not existing["raw_name"] and entry["raw_name"]:
+            existing["raw_name"] = entry["raw_name"]
+
+    return [merged[name] for name in order]
     return nets
 
 
@@ -273,8 +293,9 @@ def render_skidl(
     lines.append("from typing import Any, Dict")
     lines.append("")
     lines.append(
-        "from skidl import (Circuit, Net, Part, Pin, TEMPLATE, SKIDL, KICAD8, ERC, generate_netlist, generate_pcb, reset, set_default_tool)"
+        "from skidl import (Circuit, Net, Part, Pin, TEMPLATE, SKIDL, KICAD8, ERC, reset, set_default_tool)"
     )
+    lines.append("from skidl.logger import active_logger")
     lines.append("")
     lines.append(f"DEFAULT_NETLIST_FILE = {py_string(default_netlist)}")
     lines.append(f"DEFAULT_PCB_FILE = {py_string(default_pcb)}")
@@ -290,7 +311,7 @@ def render_skidl(
     lines.append("    nets: Dict[str, Net] = {}")
     lines.append("    parts: Dict[str, Part] = {}")
     lines.append("    with circuit:")
-    lines.append("        set_default_tool(SKIDL)")
+    lines.append("        set_default_tool(KICAD8)")
 
     # Net declarations.
     lines.append("        # Net declarations")
@@ -298,6 +319,7 @@ def render_skidl(
         var = net["var_name"]
         display_name = net["display_name"]
         lines.append(f"        {var} = Net({py_string(display_name)})")
+        lines.append(f"        {var}.tag = {py_string(display_name)}")
         lines.append(f"        nets[{py_string(display_name)}] = {var}")
 
     # Component declarations.
@@ -311,6 +333,8 @@ def render_skidl(
         lines.append(
             f"        {var} = Part(name={py_string(comp['library_reference'] or comp['ref'])}, dest=TEMPLATE, tool=SKIDL, pins=[\n            {pins_repr}\n        ])(ref={py_string(comp['ref'])}, value={py_string(comp['value'])})"
         )
+        lines.append(f"        {var}.tool = KICAD8")
+        lines.append(f"        {var}.tag = {py_string(comp['ref'])}")
         if comp.get("footprint"):
             lines.append(f"        {var}.footprint = {py_string(comp['footprint'])}")
         lines.append(f"        parts[{py_string(comp['ref'])}] = {var}")
@@ -337,16 +361,28 @@ def render_skidl(
     lines.append("def export_to_kicad(netlist_path: str | None = DEFAULT_NETLIST_FILE, pcb_path: str | None = DEFAULT_PCB_FILE, run_erc: bool = True) -> None:")
     lines.append("    \"\"\"Run ERC and export KiCad artefacts from the generated circuit.\"\"\"")
     lines.append("    data = build_circuit()")
+    lines.append("    circuit = data['circuit']")
     lines.append("    set_default_tool(KICAD8)")
+    lines.append("    import skidl")
+    lines.append("    def _suppress_empty_footprint(part):")
+    lines.append("        active_logger.warning(f'No footprint assigned to {part.ref} ({part.name}).')")
+    lines.append("    skidl.empty_footprint_handler = _suppress_empty_footprint")
+    lines.append("    for part in circuit.parts:")
+    lines.append("        part.tool = KICAD8")
+    lines.append("        if not getattr(part, 'tag', None):")
+    lines.append("            part.tag = part.ref")
+    lines.append("    for net in circuit.nets:")
+    lines.append("        if not getattr(net, 'tag', None):")
+    lines.append("            net.tag = net.name")
     lines.append("    if run_erc:")
-    lines.append("        ERC()")
+    lines.append("        circuit.ERC()")
     lines.append("    if netlist_path:")
     lines.append("        path = Path(netlist_path)")
-    lines.append("        generate_netlist(file_=str(path))")
+    lines.append("        circuit.generate_netlist(file_=str(path), tool=KICAD8, do_backup=False)")
     lines.append("    if pcb_path:")
     lines.append("        try:")
     lines.append("            path = Path(pcb_path)")
-    lines.append("            generate_pcb(file_=str(path))")
+    lines.append("            circuit.generate_pcb(file_=str(path), tool=KICAD8, do_backup=False)")
     lines.append("        except Exception as exc:")
     lines.append("            print(f'PCB export failed: {exc}')")
     lines.append("")
