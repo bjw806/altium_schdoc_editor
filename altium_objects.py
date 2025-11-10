@@ -62,6 +62,11 @@ class RecordType(IntEnum):
     RECORD_46 = 46
     RECORD_47 = 47
     RECORD_48 = 48
+    # Hierarchical sheet entry objects (stored in Additional stream)
+    SHEET_ENTRY_CONNECTION = 215
+    SHEET_ENTRY_PORT = 216
+    SHEET_ENTRY_LABEL = 217
+    SHEET_ENTRY_LINE = 218
 
 
 class PinElectrical(IntEnum):
@@ -218,6 +223,10 @@ class Component(AltiumObject):
     # Library reference
     library_reference: str = ""
     component_description: str = ""
+
+    # Component designator (e.g., "R1", "U1", "C2")
+    # Automatically extracted from RECORD=34 Designator child
+    designator: str = ""
 
     # Position and orientation
     location_x: int = 0
@@ -673,6 +682,161 @@ class ImplementationList(AltiumObject):
 
     def __post_init__(self):
         self.record_type = RecordType.IMPLEMENTATION_LIST
+
+
+@dataclass
+class Port(AltiumObject):
+    """
+    Port object (RECORD=18)
+    Hierarchical sheet port for connecting to other sheets
+    """
+    name: str = ""
+    location_x: int = 0
+    location_y: int = 0
+    width: int = 0
+    height: int = 0
+
+    # Port styling
+    color: int = 0
+    area_color: int = 0
+    font_id: int = 0
+
+    # Port type
+    harness_type: str = ""  # e.g., "I2C"
+
+    owner_index: int = -1
+
+    def __post_init__(self):
+        self.record_type = RecordType.PORT
+
+
+@dataclass
+class NoERC(AltiumObject):
+    """
+    No ERC marker (RECORD=22)
+    Marks location where electrical rule check should be suppressed
+    """
+    location_x: int = 0
+    location_y: int = 0
+    orientation: Orientation = Orientation.RIGHT
+
+    is_active: bool = True
+    color: int = 0
+
+    owner_index: int = -1
+
+    def __post_init__(self):
+        self.record_type = RecordType.NO_ERC
+
+
+@dataclass
+class Designator(AltiumObject):
+    """
+    Designator text (RECORD=34)
+    Visible component designator (e.g., R1, U1, C2)
+    """
+    name: str = "Designator"
+    text: str = ""  # e.g., "R1", "U1"
+
+    location_x: int = 0
+    location_y: int = 0
+
+    # Text styling
+    color: int = 0
+    font_id: int = 0
+
+    owner_index: int = -1
+
+    def __post_init__(self):
+        self.record_type = RecordType.DESIGNATOR
+
+
+@dataclass
+class SheetEntryConnection(AltiumObject):
+    """
+    Sheet Entry Connection (RECORD=215)
+    Connection point on hierarchical sheet symbol
+    """
+    location_x: int = 0
+    location_y: int = 0
+
+    x_size: int = 0
+    y_size: int = 0
+
+    color: int = 0
+    area_color: int = 0
+    line_width: int = 1
+
+    primary_connection_position: int = 0
+
+    def __post_init__(self):
+        self.record_type = RecordType.SHEET_ENTRY_CONNECTION
+
+
+@dataclass
+class SheetEntryPort(AltiumObject):
+    """
+    Sheet Entry Port (RECORD=216)
+    Named port on sheet entry (e.g., SCL, SDA)
+    """
+    name: str = ""
+
+    # Port styling
+    color: int = 0
+    area_color: int = 0
+    text_color: int = 0
+    font_id: int = 0
+    text_style: str = ""
+
+    # Positioning
+    side: int = 0  # Which side of sheet entry
+    distance_from_top: int = 0
+    distance_from_top_frac: float = 0.0
+
+    def __post_init__(self):
+        self.record_type = RecordType.SHEET_ENTRY_PORT
+
+
+@dataclass
+class SheetEntryLabel(AltiumObject):
+    """
+    Sheet Entry Label (RECORD=217)
+    Text label on sheet entry (e.g., "I2C")
+    """
+    text: str = ""
+
+    location_x: int = 0
+    location_y: int = 0
+
+    # Text styling
+    color: int = 0
+    font_id: int = 0
+    justification: int = 0
+    is_mirrored: bool = False
+
+    not_auto_position: bool = False
+
+    def __post_init__(self):
+        self.record_type = RecordType.SHEET_ENTRY_LABEL
+
+
+@dataclass
+class SheetEntryLine(AltiumObject):
+    """
+    Sheet Entry Line (RECORD=218)
+    Line segment on sheet entry border
+    """
+    x1: int = 0
+    y1: int = 0
+    x2: int = 0
+    y2: int = 0
+
+    color: int = 0
+    line_width: int = 1
+    location_count: int = 2
+
+    def __post_init__(self):
+        self.record_type = RecordType.SHEET_ENTRY_LINE
 
 
 # ============================================================================

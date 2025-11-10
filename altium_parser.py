@@ -230,12 +230,26 @@ class AltiumParser:
         for idx, obj in self.objects_by_index.items():
             owner_index = PropertyParser.get_int(obj.properties, 'OWNERINDEX', -1)
 
-            if owner_index >= 0 and owner_index in self.objects_by_index:
-                parent = self.objects_by_index[owner_index]
+            if owner_index >= 0:
+                # OWNERINDEX is 0-based index excluding HEADER
+                # Our objects_by_index includes HEADER at index 0, so add 1
+                actual_owner_index = owner_index + 1
 
-                # Add to parent's children list if it has one
-                if hasattr(parent, 'children'):
-                    parent.children.append(obj)
+                if actual_owner_index in self.objects_by_index:
+                    parent = self.objects_by_index[actual_owner_index]
+
+                    # Add to parent's children list if it has one
+                    if hasattr(parent, 'children'):
+                        parent.children.append(obj)
+
+        # Third pass: extract component designators from children
+        for obj in self.objects_by_index.values():
+            if isinstance(obj, Component):
+                # Find Designator child
+                for child in obj.children:
+                    if isinstance(child, Designator):
+                        obj.designator = child.text
+                        break
 
         # Extract header and sheet
         if 0 in self.objects_by_index:
@@ -281,8 +295,11 @@ class AltiumParser:
             RecordType.WIRE: self._parse_wire,
             RecordType.NET_LABEL: self._parse_net_label,
             RecordType.POWER_PORT: self._parse_power_port,
+            RecordType.PORT: self._parse_port,
+            RecordType.NO_ERC: self._parse_no_erc,
             RecordType.JUNCTION: self._parse_junction,
             RecordType.PARAMETER: self._parse_parameter,
+            RecordType.DESIGNATOR: self._parse_designator,
             RecordType.BUS: self._parse_bus,
             RecordType.BUS_ENTRY: self._parse_bus_entry,
             RecordType.LINE: self._parse_line,
@@ -294,6 +311,11 @@ class AltiumParser:
             RecordType.LABEL: self._parse_label,
             RecordType.IMPLEMENTATION: self._parse_implementation,
             RecordType.IMPLEMENTATION_LIST: self._parse_implementation_list,
+            # Sheet Entry objects
+            RecordType.SHEET_ENTRY_CONNECTION: self._parse_sheet_entry_connection,
+            RecordType.SHEET_ENTRY_PORT: self._parse_sheet_entry_port,
+            RecordType.SHEET_ENTRY_LABEL: self._parse_sheet_entry_label,
+            RecordType.SHEET_ENTRY_LINE: self._parse_sheet_entry_line,
         }
 
         parser = parsers.get(record_id)
@@ -741,6 +763,111 @@ class AltiumParser:
         obj = ImplementationList()
         obj.index = index
         obj.owner_index = PropertyParser.get_int(props, 'OWNERINDEX', obj.owner_index)
+        return obj
+
+    def _parse_port(self, props: Dict[str, str], index: int) -> Port:
+        """Parse port (RECORD=18)"""
+        obj = Port()
+        obj.index = index
+        obj.name = PropertyParser.get_str(props, 'NAME', obj.name)
+        obj.location_x = self._parse_location(props, 'X')
+        obj.location_y = self._parse_location(props, 'Y')
+        obj.width = PropertyParser.get_int(props, 'WIDTH', obj.width)
+        obj.height = PropertyParser.get_int(props, 'HEIGHT', obj.height)
+        obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
+        obj.area_color = PropertyParser.get_int(props, 'AREACOLOR', obj.area_color)
+        obj.font_id = PropertyParser.get_int(props, 'FONTID', obj.font_id)
+        obj.harness_type = PropertyParser.get_str(props, 'HARNESSTYPE', obj.harness_type)
+        obj.owner_index = PropertyParser.get_int(props, 'OWNERINDEX', obj.owner_index)
+        return obj
+
+    def _parse_no_erc(self, props: Dict[str, str], index: int) -> NoERC:
+        """Parse No ERC marker (RECORD=22)"""
+        obj = NoERC()
+        obj.index = index
+        obj.location_x = self._parse_location(props, 'X')
+        obj.location_y = self._parse_location(props, 'Y')
+
+        orientation = PropertyParser.get_int(props, 'ORIENTATION', 0)
+        orientation_deg = orientation * 90 if orientation in [0, 1, 2, 3] else 0
+        obj.orientation = Orientation(orientation_deg)
+
+        obj.is_active = PropertyParser.get_str(props, 'ISACTIVE', 'T') == 'T'
+        obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
+        obj.owner_index = PropertyParser.get_int(props, 'OWNERINDEX', obj.owner_index)
+        return obj
+
+    def _parse_designator(self, props: Dict[str, str], index: int) -> Designator:
+        """Parse Designator text (RECORD=34)"""
+        obj = Designator()
+        obj.index = index
+        obj.name = PropertyParser.get_str(props, 'NAME', obj.name)
+        obj.text = PropertyParser.get_str(props, 'TEXT', obj.text)
+        obj.location_x = self._parse_location(props, 'X')
+        obj.location_y = self._parse_location(props, 'Y')
+        obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
+        obj.font_id = PropertyParser.get_int(props, 'FONTID', obj.font_id)
+        obj.owner_index = PropertyParser.get_int(props, 'OWNERINDEX', obj.owner_index)
+        return obj
+
+    def _parse_sheet_entry_connection(self, props: Dict[str, str], index: int) -> SheetEntryConnection:
+        """Parse Sheet Entry Connection (RECORD=215)"""
+        obj = SheetEntryConnection()
+        obj.index = index
+        obj.location_x = self._parse_location(props, 'X')
+        obj.location_y = self._parse_location(props, 'Y')
+        obj.x_size = PropertyParser.get_int(props, 'XSIZE', obj.x_size)
+        obj.y_size = PropertyParser.get_int(props, 'YSIZE', obj.y_size)
+        obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
+        obj.area_color = PropertyParser.get_int(props, 'AREACOLOR', obj.area_color)
+        obj.line_width = PropertyParser.get_int(props, 'LINEWIDTH', obj.line_width)
+        obj.primary_connection_position = PropertyParser.get_int(props, 'PRIMARYCONNECTIONPOSITION', obj.primary_connection_position)
+        return obj
+
+    def _parse_sheet_entry_port(self, props: Dict[str, str], index: int) -> SheetEntryPort:
+        """Parse Sheet Entry Port (RECORD=216)"""
+        obj = SheetEntryPort()
+        obj.index = index
+        obj.name = PropertyParser.get_str(props, 'NAME', obj.name)
+        obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
+        obj.area_color = PropertyParser.get_int(props, 'AREACOLOR', obj.area_color)
+        obj.text_color = PropertyParser.get_int(props, 'TEXTCOLOR', obj.text_color)
+        obj.font_id = PropertyParser.get_int(props, 'FONTID', obj.font_id)
+        obj.text_style = PropertyParser.get_str(props, 'TEXTSTYLE', obj.text_style)
+        obj.side = PropertyParser.get_int(props, 'SIDE', obj.side)
+        obj.distance_from_top = PropertyParser.get_int(props, 'DISTANCEFROMTOP', obj.distance_from_top)
+
+        # Fractional distance
+        frac = PropertyParser.get_int(props, 'DISTANCEFROMTOP_FRAC1', 0)
+        obj.distance_from_top_frac = frac / 100000.0 if frac > 0 else 0.0
+
+        return obj
+
+    def _parse_sheet_entry_label(self, props: Dict[str, str], index: int) -> SheetEntryLabel:
+        """Parse Sheet Entry Label (RECORD=217)"""
+        obj = SheetEntryLabel()
+        obj.index = index
+        obj.text = PropertyParser.get_str(props, 'TEXT', obj.text)
+        obj.location_x = self._parse_location(props, 'X')
+        obj.location_y = self._parse_location(props, 'Y')
+        obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
+        obj.font_id = PropertyParser.get_int(props, 'FONTID', obj.font_id)
+        obj.justification = PropertyParser.get_int(props, 'JUSTIFICATION', obj.justification)
+        obj.is_mirrored = PropertyParser.get_str(props, 'ISMIRRORED', '') == 'T'
+        obj.not_auto_position = PropertyParser.get_str(props, 'NOTAUTOPOSITION', '') == 'T'
+        return obj
+
+    def _parse_sheet_entry_line(self, props: Dict[str, str], index: int) -> SheetEntryLine:
+        """Parse Sheet Entry Line (RECORD=218)"""
+        obj = SheetEntryLine()
+        obj.index = index
+        obj.x1 = PropertyParser.get_int(props, 'X1', obj.x1)
+        obj.y1 = PropertyParser.get_int(props, 'Y1', obj.y1)
+        obj.x2 = PropertyParser.get_int(props, 'X2', obj.x2)
+        obj.y2 = PropertyParser.get_int(props, 'Y2', obj.y2)
+        obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
+        obj.line_width = PropertyParser.get_int(props, 'LINEWIDTH', obj.line_width)
+        obj.location_count = PropertyParser.get_int(props, 'LOCATIONCOUNT', obj.location_count)
         return obj
 
     # ========================================================================
