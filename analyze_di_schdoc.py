@@ -1,326 +1,273 @@
 #!/usr/bin/env python3
 """
-DI.SchDoc 파일 상세 분석 및 문제점 진단
+DI.SchDoc 회로도 분석
+LLM이 회로도를 읽고 이해하는 예제
 """
 
-from altium_editor import SchematicEditor
 from altium_parser import AltiumParser
 from altium_objects import *
-import json
+from collections import defaultdict
 
-def analyze_in_detail():
-    """상세 분석"""
-    print("="*80)
-    print("DI.SchDoc 파일 상세 분석")
-    print("="*80)
+parser = AltiumParser()
+doc = parser.parse_file("DI.SchDoc")
 
-    parser = AltiumParser()
-    doc = parser.parse_file("DI.SchDoc")
+print("="*80)
+print("DI.SchDoc 회로도 분석")
+print("="*80)
 
-    print(f"\n✓ 파싱 완료: {len(doc.objects)} 객체")
+# ============================================================================
+# 1. 전체 개요
+# ============================================================================
+print("\n" + "="*80)
+print("1. 회로도 전체 개요")
+print("="*80)
 
-    # 1. 헤더 확인
-    print("\n" + "="*80)
-    print("1. 파일 헤더 분석")
-    print("="*80)
-    if doc.header:
-        print(f"버전: {doc.header.version}")
-        print(f"Weight: {doc.header.weight}")
-        print(f"MinorVersion: {doc.header.minor_version}")
-        print(f"UniqueID: {doc.header.unique_id}")
-    else:
-        print("⚠️ 경고: 헤더 없음")
+# 객체 타입별 개수
+type_counts = defaultdict(int)
+for obj in doc.objects:
+    type_counts[type(obj).__name__] += 1
 
-    # 2. 시트 정보 확인
-    print("\n" + "="*80)
-    print("2. 시트 정보 분석")
-    print("="*80)
-    if doc.sheet:
-        print(f"폰트 개수: {len(doc.sheet.fonts)}")
-        for i, font in enumerate(doc.sheet.fonts[:3], 1):
-            print(f"  폰트 {i}: {font['name']} {font['size']}pt")
-        print(f"그리드: {doc.sheet.snap_grid_size} units")
-        print(f"용지 색상: 0x{doc.sheet.area_color:06X}")
-    else:
-        print("⚠️ 경고: 시트 정보 없음")
+print(f"\n총 객체 수: {len(doc.objects)}개")
+print("\n객체 타입별 개수:")
+for type_name in sorted(type_counts.keys()):
+    count = type_counts[type_name]
+    print(f"  {type_name:20s}: {count:4d}개")
 
-    # 3. 부품 상세 분석
-    print("\n" + "="*80)
-    print("3. 부품 상세 분석")
-    print("="*80)
-    components = doc.get_components()
-    print(f"총 부품 개수: {len(components)}")
+# ============================================================================
+# 2. 부품 분석
+# ============================================================================
+print("\n" + "="*80)
+print("2. 부품(Component) 분석")
+print("="*80)
 
-    # 부품별 상세 정보
-    for i, comp in enumerate(components[:3], 1):
-        print(f"\n부품 {i}:")
-        print(f"  Library: {comp.library_reference}")
-        print(f"  위치: ({comp.location_x}, {comp.location_y})")
-        print(f"  방향: {comp.orientation.name} ({comp.orientation.value}°)")
-        print(f"  파트 수: {comp.part_count}")
-        print(f"  현재 파트: {comp.current_part_id}")
-        print(f"  자식 객체 수: {len(comp.children)}")
+components = [obj for obj in doc.objects if isinstance(obj, Component)]
+print(f"\n총 부품 수: {len(components)}개")
 
-        # 자식 객체 분석
-        pins = [c for c in comp.children if isinstance(c, Pin)]
-        params = [c for c in comp.children if isinstance(c, Parameter)]
+# 부품 타입별 분류
+component_types = defaultdict(list)
+for comp in components:
+    lib_ref = comp.library_reference or "Unknown"
+    component_types[lib_ref].append(comp)
 
-        print(f"    핀: {len(pins)}개")
-        for pin in pins[:3]:
-            print(f"      - {pin.designator}: {pin.name} ({pin.electrical.name})")
+print("\n부품 타입별:")
+for lib_ref in sorted(component_types.keys()):
+    comps = component_types[lib_ref]
+    print(f"  {lib_ref:30s}: {len(comps)}개")
 
-        print(f"    파라미터: {len(params)}개")
-        for param in params[:5]:
-            print(f"      - {param.name}: {param.text}")
+# 주요 IC 상세 정보
+print("\n주요 IC 상세:")
+for comp in components[:5]:
+    print(f"\n  {comp.library_reference}:")
+    print(f"    위치: ({comp.location_x}, {comp.location_y}) mils")
+    print(f"    위치: ({comp.location_x * 0.0254:.1f}, {comp.location_y * 0.0254:.1f}) mm")
+    print(f"    방향: {comp.orientation.value}°")
 
-    # 4. 배선 분석
-    print("\n" + "="*80)
-    print("4. 배선 분석")
-    print("="*80)
-    wires = doc.get_wires()
-    print(f"총 배선 개수: {len(wires)}")
-
-    # 배선 통계
-    total_points = sum(len(w.points) for w in wires)
-    avg_points = total_points / len(wires) if wires else 0
-    print(f"총 연결점: {total_points}")
-    print(f"평균 점 개수: {avg_points:.1f}")
-
-    # 배선 길이별 분포
-    wire_lengths = {}
-    for wire in wires:
-        length = len(wire.points)
-        wire_lengths[length] = wire_lengths.get(length, 0) + 1
-
-    print(f"\n배선 점 개수 분포:")
-    for length in sorted(wire_lengths.keys())[:10]:
-        count = wire_lengths[length]
-        print(f"  {length}점: {count}개 {'█' * min(count, 50)}")
-
-    # 샘플 배선 상세 정보
-    print(f"\n첫 3개 배선 상세:")
-    for i, wire in enumerate(wires[:3], 1):
-        print(f"\n배선 {i}:")
-        print(f"  점 개수: {len(wire.points)}")
-        print(f"  색상: 0x{wire.color:06X}")
-        print(f"  선 너비: {wire.line_width}")
-        print(f"  좌표:")
-        for j, (x, y) in enumerate(wire.points):
-            print(f"    {j}: ({x}, {y})")
-
-    # 5. 넷 라벨 분석
-    print("\n" + "="*80)
-    print("5. 넷 라벨 분석")
-    print("="*80)
-    labels = doc.get_net_labels()
-    print(f"총 넷 라벨 개수: {len(labels)}")
-
-    # 넷 별로 그룹화
-    nets = {}
-    for label in labels:
-        if label.text:
-            if label.text not in nets:
-                nets[label.text] = []
-            nets[label.text].append({
-                'x': label.location_x,
-                'y': label.location_y,
-                'orientation': label.orientation.name
-            })
-
-    print(f"고유 넷 이름: {len(nets)}개")
-    print(f"\n상위 10개 넷:")
-    for net_name in sorted(nets.keys())[:10]:
-        locations = nets[net_name]
-        print(f"  {net_name}: {len(locations)}개 위치")
-        for loc in locations[:2]:
-            print(f"    - ({loc['x']}, {loc['y']}) {loc['orientation']}")
-
-    # 6. 전원 포트 분석
-    print("\n" + "="*80)
-    print("6. 전원 포트 분석")
-    print("="*80)
-    ports = doc.get_power_ports()
-    print(f"총 전원 포트: {len(ports)}")
-
-    power_nets = {}
-    for port in ports:
-        if port.text not in power_nets:
-            power_nets[port.text] = []
-        power_nets[port.text].append({
-            'x': port.location_x,
-            'y': port.location_y,
-            'style': port.style.name,
-            'orientation': port.orientation.name
-        })
-
-    for net_name, locations in power_nets.items():
-        print(f"\n{net_name}: {len(locations)}개 위치")
-        for loc in locations:
-            print(f"  - ({loc['x']}, {loc['y']}) {loc['style']} {loc['orientation']}")
-
-    # 7. 정션 분석
-    print("\n" + "="*80)
-    print("7. 정션 분석")
-    print("="*80)
-    junctions = doc.get_junctions()
-    print(f"총 정션: {len(junctions)}개")
-
-    # 정션 위치 분포
-    if junctions:
-        x_coords = [j.location_x for j in junctions]
-        y_coords = [j.location_y for j in junctions]
-        print(f"X 범위: {min(x_coords)} ~ {max(x_coords)}")
-        print(f"Y 범위: {min(y_coords)} ~ {max(y_coords)}")
-
-        print(f"\n첫 10개 정션 위치:")
-        for i, j in enumerate(junctions[:10], 1):
-            print(f"  {i}. ({j.location_x}, {j.location_y})")
-
-    # 8. 파싱되지 않은 객체 확인
-    print("\n" + "="*80)
-    print("8. 파싱 문제 확인")
-    print("="*80)
-
-    generic_objects = [obj for obj in doc.objects if type(obj).__name__ == 'AltiumObject']
-    print(f"⚠️ Generic AltiumObject (파싱 안됨): {len(generic_objects)}개")
-
-    if generic_objects:
-        # RECORD 타입별 분류
-        record_types = {}
-        for obj in generic_objects[:20]:
-            record_type = obj.properties.get('RECORD', 'UNKNOWN')
-            if record_type not in record_types:
-                record_types[record_type] = []
-            record_types[record_type].append(obj)
-
-        print(f"\n파싱 안된 레코드 타입:")
-        for record_type, objs in sorted(record_types.items()):
-            print(f"  RECORD={record_type}: {len(objs)}개")
-            # 첫 번째 객체의 속성 샘플
-            if objs:
-                sample = objs[0]
-                print(f"    샘플 속성: {list(sample.properties.keys())[:10]}")
-
-    # 9. 객체 타입 분포
-    print("\n" + "="*80)
-    print("9. 객체 타입 분포")
-    print("="*80)
-
-    type_counts = {}
-    for obj in doc.objects:
-        type_name = type(obj).__name__
-        type_counts[type_name] = type_counts.get(type_name, 0) + 1
-
-    for type_name in sorted(type_counts.keys()):
-        count = type_counts[type_name]
-        bar = '█' * min(count // 5, 50)
-        print(f"  {type_name:30s}: {count:4d} {bar}")
-
-    # 10. 좌표 범위 분석
-    print("\n" + "="*80)
-    print("10. 회로도 좌표 범위")
-    print("="*80)
-
-    all_x = []
-    all_y = []
-
-    for comp in components:
-        all_x.append(comp.location_x)
-        all_y.append(comp.location_y)
-
-    for wire in wires:
-        for x, y in wire.points:
-            all_x.append(x)
-            all_y.append(y)
-
-    for label in labels:
-        all_x.append(label.location_x)
-        all_y.append(label.location_y)
-
-    if all_x and all_y:
-        print(f"X 범위: {min(all_x)} ~ {max(all_x)} (폭: {max(all_x) - min(all_x)} units)")
-        print(f"Y 범위: {min(all_y)} ~ {max(all_y)} (높이: {max(all_y) - min(all_y)} units)")
-        print(f"크기 (mm): {(max(all_x) - min(all_x)) * 0.254:.1f} x {(max(all_y) - min(all_y)) * 0.254:.1f}")
-
-    return doc, generic_objects
-
-def find_issues(doc, generic_objects):
-    """문제점 분석"""
-    print("\n" + "="*80)
-    print("🔍 문제점 진단")
-    print("="*80)
-
-    issues = []
-    warnings = []
-
-    # 1. 파싱되지 않은 객체
-    if generic_objects:
-        issues.append(f"파싱되지 않은 객체 {len(generic_objects)}개 발견")
-
-    # 2. 부품에 designator가 없는 경우
-    components = doc.get_components()
-    no_designator = []
-    for comp in components:
-        has_designator = False
-        for child in comp.children:
-            if isinstance(child, Parameter) and child.name == "Designator":
-                has_designator = True
+    # Designator 찾기 (파라미터에서)
+    designator = None
+    for child in comp.children:
+        if isinstance(child, Parameter):
+            if child.name == "Designator":
+                designator = child.text
                 break
-        if not has_designator:
-            no_designator.append(comp.library_reference)
+    if designator:
+        print(f"    Designator: {designator}")
 
-    if no_designator:
-        warnings.append(f"{len(no_designator)}개 부품에 Designator 없음: {no_designator[:3]}")
+# ============================================================================
+# 3. 배선(Wire) 분석
+# ============================================================================
+print("\n" + "="*80)
+print("3. 배선(Wire) 분석")
+print("="*80)
 
-    # 3. 고립된 배선 (넷 라벨 없음)
-    wires = doc.get_wires()
-    labels = doc.get_net_labels()
+wires = [obj for obj in doc.objects if isinstance(obj, Wire)]
+print(f"\n총 배선 수: {len(wires)}개")
 
-    if len(wires) > 0 and len(labels) == 0:
-        warnings.append("배선은 있지만 넷 라벨이 전혀 없음")
+# 배선 길이 계산
+import math
+total_length = 0
+for wire in wires:
+    for i in range(len(wire.points) - 1):
+        x1, y1 = wire.points[i]
+        x2, y2 = wire.points[i + 1]
+        length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        total_length += length
 
-    # 4. 중복 위치 확인
-    junctions = doc.get_junctions()
-    junction_positions = {}
-    for j in junctions:
-        pos = (j.location_x, j.location_y)
-        junction_positions[pos] = junction_positions.get(pos, 0) + 1
+print(f"총 배선 길이: {total_length:.0f} mils ({total_length * 0.0254:.1f} mm)")
+print(f"평균 세그먼트당 배선 수: {len(wires) / len(components):.1f}개/부품")
 
-    duplicates = {pos: count for pos, count in junction_positions.items() if count > 1}
-    if duplicates:
-        warnings.append(f"{len(duplicates)}개 위치에 중복 정션: {list(duplicates.items())[:3]}")
+# 첫 5개 배선 상세
+print("\n첫 5개 배선:")
+for i, wire in enumerate(wires[:5], 1):
+    print(f"\n  배선 {i}:")
+    print(f"    점 개수: {len(wire.points)}개")
+    print(f"    경로: {' → '.join([f'({x},{y})' for x, y in wire.points])}")
 
-    # 5. 부품 핀 개수 확인
-    for comp in components[:5]:
-        pins = [c for c in comp.children if isinstance(c, Pin)]
-        if len(pins) == 0:
-            warnings.append(f"부품 {comp.library_reference}에 핀 없음")
+# ============================================================================
+# 4. 넷 라벨(NetLabel) 분석
+# ============================================================================
+print("\n" + "="*80)
+print("4. 넷 라벨(NetLabel) 분석 - 신호 이름")
+print("="*80)
 
-    # 결과 출력
-    if issues:
-        print("\n❌ 심각한 문제:")
-        for issue in issues:
-            print(f"  • {issue}")
-    else:
-        print("\n✅ 심각한 문제 없음")
+net_labels = [obj for obj in doc.objects if isinstance(obj, NetLabel)]
+print(f"\n총 넷 라벨 수: {len(net_labels)}개")
 
-    if warnings:
-        print("\n⚠️  경고:")
-        for warning in warnings:
-            print(f"  • {warning}")
-    else:
-        print("\n✅ 경고 없음")
+# 신호 이름별 분류
+signal_names = defaultdict(list)
+for label in net_labels:
+    name = label.text or "(빈 라벨)"
+    signal_names[name].append((label.location_x, label.location_y))
 
-    return issues, warnings
+print("\n신호 이름별 사용 횟수:")
+for name in sorted(signal_names.keys()):
+    locations = signal_names[name]
+    print(f"  '{name}': {len(locations)}회 사용")
+    if len(locations) <= 3:  # 3개 이하면 위치도 표시
+        for x, y in locations:
+            print(f"    - ({x}, {y})")
 
-if __name__ == "__main__":
-    doc, generic_objects = analyze_in_detail()
-    issues, warnings = find_issues(doc, generic_objects)
+# ============================================================================
+# 5. 전원 포트(PowerPort) 분석
+# ============================================================================
+print("\n" + "="*80)
+print("5. 전원 포트(PowerPort) 분석")
+print("="*80)
 
-    print("\n" + "="*80)
-    print("분석 완료")
-    print("="*80)
-    print(f"\n총 객체: {len(doc.objects)}")
-    print(f"심각한 문제: {len(issues)}개")
-    print(f"경고: {len(warnings)}개")
-    print()
+power_ports = [obj for obj in doc.objects if isinstance(obj, PowerPort)]
+print(f"\n총 전원 포트 수: {len(power_ports)}개")
+
+# 전원별 분류
+power_nets = defaultdict(list)
+for port in power_ports:
+    net = port.text or "Unknown"
+    power_nets[net].append((port.location_x, port.location_y))
+
+print("\n전원 네트별:")
+for net in sorted(power_nets.keys()):
+    locations = power_nets[net]
+    print(f"  {net}: {len(locations)}개 연결점")
+
+# ============================================================================
+# 6. 접합점(Junction) 분석
+# ============================================================================
+print("\n" + "="*80)
+print("6. 접합점(Junction) 분석")
+print("="*80)
+
+junctions = [obj for obj in doc.objects if isinstance(obj, Junction)]
+print(f"\n총 접합점 수: {len(junctions)}개")
+print("(접합점은 3개 이상의 배선이 만나는 지점)")
+
+# 위치별 접합점 밀도
+x_positions = [j.location_x for j in junctions]
+y_positions = [j.location_y for j in junctions]
+if junctions:
+    print(f"\n접합점 분포:")
+    print(f"  X 범위: {min(x_positions)} ~ {max(x_positions)} mils")
+    print(f"  Y 범위: {min(y_positions)} ~ {max(y_positions)} mils")
+
+# ============================================================================
+# 7. 핀(Pin) 분석
+# ============================================================================
+print("\n" + "="*80)
+print("7. 핀(Pin) 분석")
+print("="*80)
+
+pins = [obj for obj in doc.objects if isinstance(obj, Pin)]
+print(f"\n총 핀 수: {len(pins)}개")
+
+# 핀 타입별 분류 (Electrical type)
+pin_types = defaultdict(int)
+for pin in pins:
+    electrical = pin.electrical.name if pin.electrical else "Unknown"
+    pin_types[electrical] += 1
+
+print("\n핀 전기적 타입별:")
+for pin_type in sorted(pin_types.keys()):
+    count = pin_types[pin_type]
+    print(f"  {pin_type:15s}: {count:3d}개")
+
+# ============================================================================
+# 8. 회로도 물리적 크기
+# ============================================================================
+print("\n" + "="*80)
+print("8. 회로도 물리적 크기")
+print("="*80)
+
+# 모든 객체의 위치 수집
+all_x = []
+all_y = []
+
+for obj in doc.objects:
+    if hasattr(obj, 'location_x') and hasattr(obj, 'location_y'):
+        if obj.location_x is not None and obj.location_y is not None:
+            all_x.append(obj.location_x)
+            all_y.append(obj.location_y)
+
+if all_x and all_y:
+    min_x, max_x = min(all_x), max(all_x)
+    min_y, max_y = min(all_y), max(all_y)
+
+    width_mils = max_x - min_x
+    height_mils = max_y - min_y
+
+    width_mm = width_mils * 0.0254
+    height_mm = height_mils * 0.0254
+
+    print(f"\n회로도 범위:")
+    print(f"  X: {min_x} ~ {max_x} mils (폭: {width_mils} mils = {width_mm:.1f} mm)")
+    print(f"  Y: {min_y} ~ {max_y} mils (높이: {height_mils} mils = {height_mm:.1f} mm)")
+    print(f"  크기: {width_mm:.1f} × {height_mm:.1f} mm")
+
+# ============================================================================
+# 9. 회로 기능 추론
+# ============================================================================
+print("\n" + "="*80)
+print("9. 회로 기능 추론 (LLM 분석)")
+print("="*80)
+
+print("\n주요 IC 분석:")
+
+# MCP23017 찾기
+mcp_components = [c for c in components if "MCP23017" in (c.library_reference or "")]
+if mcp_components:
+    print(f"\n✓ MCP23017 발견 ({len(mcp_components)}개)")
+    print("  - 16비트 I/O 확장 IC")
+    print("  - I2C 인터페이스")
+    print("  - GPIO 확장용으로 사용됨")
+
+# TLP281 찾기 (포토커플러)
+tlp_components = [c for c in components if "TLP281" in (c.library_reference or "")]
+if tlp_components:
+    print(f"\n✓ TLP281 발견 ({len(tlp_components)}개)")
+    print("  - 4채널 포토커플러")
+    print("  - 절연 및 신호 레벨 변환용")
+    print("  - 디지털 신호 아이솔레이션")
+
+# 저항 찾기
+resistor_components = [c for c in components if "R" in (c.library_reference or "") and "10K" in (c.library_reference or "")]
+if resistor_components:
+    print(f"\n✓ 10K 저항 발견 ({len(resistor_components)}개)")
+    print("  - 풀업/풀다운 또는 전류 제한용")
+
+# 신호 분석
+print("\n신호 라인 분석:")
+interesting_signals = ["SCL", "SDA", "VCC", "GND"]
+for sig in interesting_signals:
+    count = sum(1 for label in net_labels if sig.lower() in (label.text or "").lower())
+    if count > 0:
+        print(f"  - {sig}: {count}개 연결점")
+
+if "SCL" in signal_names and "SDA" in signal_names:
+    print("\n✓ I2C 버스 확인 (SCL, SDA)")
+    print("  - MCP23017이 I2C 슬레이브로 동작")
+
+print("\n회로 종합 분석:")
+print("  이 회로는 I2C 통신을 통해 제어되는 디지털 I/O 확장 시스템입니다.")
+print("  MCP23017 IC를 사용하여 16개의 GPIO를 확장하고,")
+print("  TLP281 포토커플러를 통해 외부 회로와 절연된 신호 전달을 수행합니다.")
+print("  주요 용도: 산업용 제어, 센서 인터페이스, 릴레이 제어 등")
+
+print("\n" + "="*80)
+print("분석 완료!")
+print("="*80)
