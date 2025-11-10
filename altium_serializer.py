@@ -177,24 +177,22 @@ class AltiumSerializer:
 
         This copies the template and directly replaces the FileHeader stream data.
         """
-        # Simple approach: copy entire template file and replace stream data
-        self._copy_and_patch_template(filename, new_fileheader_data)
+        # Use olefile to properly modify the OLE structure
+        self._copy_and_patch_with_olefile(filename, new_fileheader_data)
 
-    def _copy_and_patch_template(self, filename: str, new_fileheader_data: bytes):
+    def _copy_and_patch_with_olefile(self, filename: str, new_fileheader_data: bytes):
         """
-        Copy template file and patch FileHeader stream.
+        Rebuild OLE file with new FileHeader data.
 
-        This is the most reliable approach - keep the OLE structure intact
-        and only modify the stream data sectors.
+        This uses OLERebuilder to properly handle large files.
         """
-        import shutil
+        from ole_rebuilder import rebuild_schdoc
 
-        # For very large files, we should rebuild the OLE structure
-        # For now, just use the minimal OLE creator
-        # TODO: Implement proper OLE patching that supports size changes
+        template = self.template_file or 'DI.SchDoc'
 
-        print(f"Note: Creating new OLE file from scratch (template patching not yet supported)")
-        self._create_minimal_ole(filename, new_fileheader_data)
+        print(f"Rebuilding OLE file with proper FAT support...")
+        rebuild_schdoc(template, filename, new_fileheader_data)
+        print(f"✓ File rebuilt successfully")
 
     def _create_minimal_ole(self, filename: str, fileheader_data: bytes):
         """
