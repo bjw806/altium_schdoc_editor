@@ -366,7 +366,9 @@ class AltiumParser:
         obj.location_y = self._parse_location(props, 'Y')
 
         orientation = PropertyParser.get_int(props, 'ORIENTATION', 0)
-        obj.orientation = Orientation(orientation) if orientation in [0, 90, 180, 270] else Orientation.RIGHT
+        # Altium stores orientation as 0, 1, 2, 3 -> convert to degrees (0, 90, 180, 270)
+        orientation_deg = orientation * 90 if orientation in [0, 1, 2, 3] else 0
+        obj.orientation = Orientation(orientation_deg)
 
         obj.current_part_id = PropertyParser.get_int(props, 'CURRENTPARTID', obj.current_part_id)
         obj.part_count = PropertyParser.get_int(props, 'PARTCOUNT', obj.part_count)
@@ -447,7 +449,9 @@ class AltiumParser:
         obj.text = PropertyParser.get_str(props, 'TEXT', obj.text)
 
         orientation = PropertyParser.get_int(props, 'ORIENTATION', 0)
-        obj.orientation = Orientation(orientation) if orientation in [0, 90, 180, 270] else Orientation.RIGHT
+        # Altium stores orientation as 0, 1, 2, 3 -> convert to degrees (0, 90, 180, 270)
+        orientation_deg = orientation * 90 if orientation in [0, 1, 2, 3] else 0
+        obj.orientation = Orientation(orientation_deg)
 
         obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
         obj.font_id = PropertyParser.get_int(props, 'FONTID', obj.font_id)
@@ -515,7 +519,9 @@ class AltiumParser:
         obj.is_mirrored = PropertyParser.get_bool(props, 'ISMIRRORED', obj.is_mirrored)
 
         orientation = PropertyParser.get_int(props, 'ORIENTATION', 0)
-        obj.orientation = Orientation(orientation) if orientation in [0, 90, 180, 270] else Orientation.RIGHT
+        # Altium stores orientation as 0, 1, 2, 3 -> convert to degrees (0, 90, 180, 270)
+        orientation_deg = orientation * 90 if orientation in [0, 1, 2, 3] else 0
+        obj.orientation = Orientation(orientation_deg)
 
         obj.owner_index = PropertyParser.get_int(props, 'OWNERINDEX', obj.owner_index)
         obj.owner_part_id = PropertyParser.get_int(props, 'OWNERPARTID', obj.owner_part_id)
@@ -696,7 +702,9 @@ class AltiumParser:
         obj.text = PropertyParser.get_str(props, 'TEXT', obj.text)
 
         orientation = PropertyParser.get_int(props, 'ORIENTATION', 0)
-        obj.orientation = Orientation(orientation) if orientation in [0, 90, 180, 270] else Orientation.RIGHT
+        # Altium stores orientation as 0, 1, 2, 3 -> convert to degrees (0, 90, 180, 270)
+        orientation_deg = orientation * 90 if orientation in [0, 1, 2, 3] else 0
+        obj.orientation = Orientation(orientation_deg)
 
         obj.color = PropertyParser.get_int(props, 'COLOR', obj.color)
         obj.font_id = PropertyParser.get_int(props, 'FONTID', obj.font_id)
