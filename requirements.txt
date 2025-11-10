@@ -1,1 +1,4 @@
 olefile
+skidl
+schemdraw
+pillow

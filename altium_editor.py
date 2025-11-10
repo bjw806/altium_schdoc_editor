@@ -677,3 +677,114 @@ class SchematicEditor:
                         designator = child.text
                         break
                 print(f"  {designator}: {comp.library_reference} at ({comp.location_x}, {comp.location_y})")
+
+    # ========================================================================
+    # SKiDL Integration
+    # ========================================================================
+
+    def to_skidl(self):
+        """
+        Convert the current schematic to a SKiDL circuit
+
+        Returns:
+            AltiumToSKiDL converter instance with converted circuit
+        """
+        from skidl_converter import AltiumToSKiDL
+
+        self._ensure_doc()
+
+        converter = AltiumToSKiDL()
+        converter.convert_schematic(self.doc)
+
+        return converter
+
+    def from_skidl(self, parts=None, nets=None):
+        """
+        Generate schematic from SKiDL circuit
+
+        Args:
+            parts: List of SKiDL Part objects (if None, uses default_circuit)
+            nets: List of SKiDL Net objects (if None, uses default_circuit)
+
+        Returns:
+            Self for method chaining
+        """
+        from skidl_generator import SKiDLToAltium
+
+        generator = SKiDLToAltium()
+        self.doc = generator.generate_schematic(parts=parts, nets=nets)
+
+        return self
+
+    def render_svg(self, output_file: str = "schematic.svg") -> str:
+        """
+        Render schematic to SVG format
+
+        Args:
+            output_file: Output SVG filename
+
+        Returns:
+            Path to generated SVG file
+        """
+        from skidl_renderer import SchematicRenderer
+
+        self._ensure_doc()
+
+        renderer = SchematicRenderer()
+        return renderer.render_to_svg(self.doc, output_file)
+
+    def render_image(self, output_file: str = "schematic.png",
+                    format: str = "png") -> str:
+        """
+        Render schematic to image format (PNG, JPEG, etc.)
+
+        Args:
+            output_file: Output image filename
+            format: Image format ('png', 'jpg', 'jpeg')
+
+        Returns:
+            Path to generated image file
+        """
+        from skidl_renderer import SchematicRenderer
+
+        self._ensure_doc()
+
+        renderer = SchematicRenderer()
+        return renderer.render_to_image(self.doc, output_file, format)
+
+    def export_kicad(self, output_file: str = "schematic.kicad_sch") -> str:
+        """
+        Export schematic to KiCad format
+
+        Args:
+            output_file: Output KiCad schematic filename
+
+        Returns:
+            Path to generated KiCad file
+        """
+        from skidl_renderer import SchematicRenderer
+
+        self._ensure_doc()
+
+        renderer = SchematicRenderer()
+        return renderer.render_to_kicad(self.doc, output_file)
+
+    def generate_netlist(self, output_file: Optional[str] = None) -> str:
+        """
+        Generate netlist from schematic using SKiDL
+
+        Args:
+            output_file: Optional output filename (without extension)
+
+        Returns:
+            Netlist as string or confirmation message
+        """
+        converter = self.to_skidl()
+        return converter.generate_netlist(output_file)
+
+    def print_skidl_summary(self):
+        """
+        Print SKiDL circuit summary
+        """
+        converter = self.to_skidl()
+        converter.print_circuit_summary()
