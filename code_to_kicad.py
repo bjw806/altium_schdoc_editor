@@ -206,22 +206,29 @@ def main():
         print("  python code_to_kicad.py circuit_code.py modified_circuit.kicad_sch")
         sys.exit(1)
     
-    python_file = sys.argv[1]
-    output_file = sys.argv[2]
-    
-    if not Path(python_file).exists():
-        print(f"Error: Python file not found: {python_file}")
+    python_path = Path(sys.argv[1])
+    output_candidate = Path(sys.argv[2])
+
+    if not python_path.exists():
+        print(f"Error: Python file not found: {python_path}")
         sys.exit(1)
+
+    if len(output_candidate.parts) == 1:
+        output_path = Path("schematics") / output_candidate
+    else:
+        output_path = output_candidate
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
     try:
         # Python 코드에서 회로도 로드
-        schematic, lib_symbols_sexp = load_circuit_from_file(python_file)
+        schematic, lib_symbols_sexp = load_circuit_from_file(str(python_path))
         
         # KiCad 파일로 export
-        export_to_kicad(schematic, output_file, lib_symbols_sexp)
+        export_to_kicad(schematic, str(output_path), lib_symbols_sexp)
         
         print("\n다음 단계:")
-        print(f"1. KiCad에서 {output_file} 파일을 열어서 확인")
+        print(f"1. KiCad에서 {output_path} 파일을 열어서 확인")
         print("2. 필요하면 Altium Designer로 import")
         
     except Exception as e:

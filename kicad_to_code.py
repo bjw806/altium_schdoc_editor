@@ -9,7 +9,6 @@ KiCad .kicad_sch 파일을 읽어서 Python API 형식의 회로도 코드로 �
 
 import sys
 from pathlib import Path
-from typing import Any
 import sexpdata
 
 
@@ -477,18 +476,25 @@ def main():
         print("  python kicad_to_code.py ./altium2kicad/DI.kicad_sch circuit_code.py")
         sys.exit(1)
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    
-    if not Path(input_file).exists():
-        print(f"Error: Input file not found: {input_file}")
+    input_path = Path(sys.argv[1])
+    output_candidate = Path(sys.argv[2])
+
+    if not input_path.exists():
+        print(f"Error: Input file not found: {input_path}")
         sys.exit(1)
+
+    if len(output_candidate.parts) == 1:
+        output_path = Path("schematics") / output_candidate
+    else:
+        output_path = output_candidate
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
     try:
-        convert_kicad_to_code(input_file, output_file)
+        convert_kicad_to_code(str(input_path), str(output_path))
         print("\n✅ Conversion successful!")
         print("\n다음 단계:")
-        print(f"1. {output_file} 파일을 LLM에 제공하여 회로도 분석")
+        print(f"1. {output_path} 파일을 LLM에 제공하여 회로도 분석")
         print("2. LLM이 수정한 코드를 받아서 다시 저장")
         print("3. python code_to_kicad.py <modified_code.py> <output.kicad_sch> 실행")
     except Exception as e:
