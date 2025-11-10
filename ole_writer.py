@@ -34,65 +34,18 @@ class OLEWriter:
         """
         # Sector size (512 bytes)
         SECTOR_SIZE = 512
-        MINI_SECTOR_SIZE = 64
 
-        # Build directory entries
-        dir_entries = []
-
-        # Calculate mini stream data (for small files < 4096 bytes)
-        mini_stream_parts = []
-        mini_stream_positions = {}  # stream_name -> position in mini stream
-        mini_stream_offset = 0
-
-        for name, data in self.streams.items():
-            if len(data) < 4096:
-                mini_stream_positions[name] = mini_stream_offset // MINI_SECTOR_SIZE
-                # Pad to mini sector boundary
-                padded = data + b'\x00' * (((len(data) + MINI_SECTOR_SIZE - 1) // MINI_SECTOR_SIZE) * MINI_SECTOR_SIZE - len(data))
-                mini_stream_parts.append(padded)
-                mini_stream_offset += len(padded)
-
-        # Build mini stream data
-        mini_stream_data = b''.join(mini_stream_parts)
-
-        # Mini stream goes in regular sectors
-        mini_stream_sectors = 0
-        if mini_stream_data:
-            mini_stream_sectors = (len(mini_stream_data) + SECTOR_SIZE - 1) // SECTOR_SIZE
-            mini_stream_data = mini_stream_data + b'\x00' * (mini_stream_sectors * SECTOR_SIZE - len(mini_stream_data))
-
-        # Root entry (first entry)
-        root_entry = self._make_dir_entry(
-            name="Root Entry",
-            type=5,  # Root storage
-            color=1,  # Black
-            did_left=-1,
-            did_right=-1,
-            did_child=1 if self.streams else -1,
-            start_sect=0 if mini_stream_data else -2,  # Mini stream starts at sector 0
-            size=len(mini_stream_data) if mini_stream_data else 0
-        )
-        dir_entries.append(root_entry)
-
-        # Add stream entries
+        # All streams are stored in regular sectors (no mini stream for simplicity)
+        # Build stream data and track sectors
+        stream_info = []  # (name, start_sector, size, sector_count)
         stream_data_parts = []
         current_sector = 0
 
-        for i, (name, data) in enumerate(self.streams.items(), 1):
+        for name, data in self.streams.items():
             # Calculate sectors needed
-            sectors_needed = (len(data) + SECTOR_SIZE - 1) // SECTOR_SIZE
+            sectors_needed = max(1, (len(data) + SECTOR_SIZE - 1) // SECTOR_SIZE)
 
-            entry = self._make_dir_entry(
-                name=name,
-                type=2,  # Stream
-                color=1,  # Black
-                did_left=-1,
-                did_right=-1,
-                did_child=-1,
-                start_sect=current_sector,
-                size=len(data)
-            )
-            dir_entries.append(entry)
+            stream_info.append((name, current_sector, len(data), sectors_needed))
 
             # Pad data to sector boundary
             padded_data = data + b'\x00' * (sectors_needed * SECTOR_SIZE - len(data))
@@ -100,8 +53,77 @@ class OLEWriter:
 
             current_sector += sectors_needed
 
-        # Pad directory entries to fill sectors
-        while len(dir_entries) < 4:  # At least 4 entries for one sector
+        # Build directory entries
+        dir_entries = []
+
+        # Root entry (entry 0)
+        root_entry = self._make_dir_entry(
+            name="Root Entry",
+            type=5,  # Root storage
+            color=1,  # Black
+            did_left=-1,
+            did_right=-1,
+            did_child=1 if stream_info else -1,  # First child is entry 1
+            start_sect=-2,  # No data (ENDOFCHAIN)
+            size=0
+        )
+        dir_entries.append(root_entry)
+
+        # Add stream entries (balanced tree structure like Altium)
+        # For 2-3 streams, use simple tree: middle node as root, others as children
+        stream_count = len(stream_info)
+
+        if stream_count == 1:
+            # Single stream: just add it
+            name, start_sect, size, _ = stream_info[0]
+            entry = self._make_dir_entry(
+                name=name, type=2, color=1,  # Black
+                did_left=-1, did_right=-1, did_child=-1,
+                start_sect=start_sect, size=size
+            )
+            dir_entries.append(entry)
+
+        elif stream_count == 2:
+            # Two streams: first is root (black), second is right child (red)
+            name1, start1, size1, _ = stream_info[0]
+            name2, start2, size2, _ = stream_info[1]
+
+            # Entry 1: Root (black)
+            entry1 = self._make_dir_entry(
+                name=name1, type=2, color=1,  # Black
+                did_left=-1, did_right=2, did_child=-1,
+                start_sect=start1, size=size1
+            )
+            dir_entries.append(entry1)
+
+            # Entry 2: Right child (red)
+            entry2 = self._make_dir_entry(
+                name=name2, type=2, color=0,  # Red
+                did_left=-1, did_right=-1, did_child=-1,
+                start_sect=start2, size=size2
+            )
+            dir_entries.append(entry2)
+
+        else:
+            # Three or more streams: build balanced tree
+            # Like original: root node with left and right children
+            # Entry order: left_child(2), right_child(1), root(3)
+            # Root's child pointer goes to entry 3
+
+            # For simplicity with 2 streams (FileHeader + Storage):
+            # Storage, FileHeader, then root=Storage with FileHeader as right
+            # But we'll use simpler approach: all streams directly under root
+            for i, (name, start_sect, size, _) in enumerate(stream_info):
+                # All as red nodes, no tree structure
+                entry = self._make_dir_entry(
+                    name=name, type=2, color=0,  # Red
+                    did_left=-1, did_right=-1, did_child=-1,
+                    start_sect=start_sect, size=size
+                )
+                dir_entries.append(entry)
+
+        # Pad directory entries to fill at least one sector
+        while len(dir_entries) < 4:  # At least 4 entries (512/128=4)
             dir_entries.append(self._make_empty_dir_entry())
 
         # Build directory data
@@ -112,39 +134,48 @@ class OLEWriter:
         dir_data = dir_data + b'\x00' * (dir_sectors_needed * SECTOR_SIZE - len(dir_data))
 
         # Build SAT (Sector Allocation Table)
-        total_sectors = current_sector + dir_sectors_needed + 1  # +1 for SAT itself
-
+        # Layout: [stream sectors] [directory sectors] [SAT sectors]
         sat = []
 
-        # Stream sectors - chain them together
-        for i in range(current_sector - 1):
-            sat.append(i + 1)  # Point to next sector
-
-        if current_sector > 0:
-            sat.append(-2)  # ENDOFCHAIN for last stream sector
+        # Stream sectors - chain each stream's sectors
+        for _, start_sect, _, sectors in stream_info:
+            for i in range(sectors):
+                if i < sectors - 1:
+                    sat.append(start_sect + i + 1)  # Point to next sector in chain
+                else:
+                    sat.append(-2)  # ENDOFCHAIN for last sector
 
         # Directory sectors - chain them together
-        for i in range(dir_sectors_needed - 1):
-            sat.append(current_sector + i + 1)
+        dir_start = current_sector
+        for i in range(dir_sectors_needed):
+            if i < dir_sectors_needed - 1:
+                sat.append(dir_start + i + 1)
+            else:
+                sat.append(-2)  # ENDOFCHAIN
 
-        sat.append(-2)  # ENDOFCHAIN for last directory sector
+        # SAT sector(s)
+        sat_start = dir_start + dir_sectors_needed
+        sat.append(-3)  # SATSECT marker for SAT sector
 
-        # SAT sector itself
-        sat.append(-3)  # SATSECT
-
-        # Pad SAT to sector boundary
+        # Pad SAT to fill sector
         sat_entries_per_sector = SECTOR_SIZE // 4
         while len(sat) < sat_entries_per_sector:
             sat.append(-1)  # FREESECT
 
         sat_data = struct.pack(f'<{len(sat)}i', *sat)
 
+        # Calculate number of FAT sectors needed
+        total_stream_sectors = current_sector
+        total_sectors = current_sector + dir_sectors_needed + 1  # +1 for SAT
+        sat_entries_needed = total_sectors
+        sat_sectors_needed = (sat_entries_needed * 4 + SECTOR_SIZE - 1) // SECTOR_SIZE
+
         # Build header
         header = self._make_header(
-            num_fat_sectors=1,
+            num_fat_sectors=sat_sectors_needed,
             num_dir_sectors=dir_sectors_needed,
-            first_dir_sector=current_sector,
-            first_fat_sector=current_sector + dir_sectors_needed,
+            first_dir_sector=dir_start,
+            first_fat_sector=sat_start,
             total_sectors=total_sectors
         )
 
@@ -186,8 +217,9 @@ class OLEWriter:
         # Total sectors (4 bytes) - can be 0 for v3
         header.write(struct.pack('<I', 0))
 
-        # FAT sectors (4 bytes)
-        header.write(struct.pack('<I', 0))
+        # FAT sectors (4 bytes) - should be 0 for v3 OLE
+        # But we'll set it anyway for compatibility
+        header.write(struct.pack('<I', num_fat_sectors))
 
         # First directory sector
         header.write(struct.pack('<i', first_dir_sector))
