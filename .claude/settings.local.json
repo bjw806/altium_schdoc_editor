@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "kicad-sch-api"
+  ],
+  "enableAllProjectMcpServers": true
+}

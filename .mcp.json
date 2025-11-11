@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kicad-sch-api": {
+      "type": "stdio",
+      "command": ".venv\\Scripts\\kicad-sch-mcp.exe",
+      "args": []
+    }
+  }
+}
