@@ -46,13 +46,19 @@ def load_circuit_from_file(python_file: str):
         print("  Found custom lib_symbols data")
         prepare_custom_symbol_libraries(lib_symbols_sexp)
     
+    # other_elements 데이터 확인
+    other_elements = None
+    if hasattr(module, 'OTHER_ELEMENTS'):
+        other_elements = module.OTHER_ELEMENTS
+        print(f"  Found {len(other_elements)} other elements to preserve")
+    
     # 회로도 생성
     schematic = module.create_schematic()
     
-    return schematic, lib_symbols_sexp
+    return schematic, lib_symbols_sexp, other_elements
 
 
-def export_to_kicad(schematic, output_file: str, lib_symbols_sexp=None):
+def export_to_kicad(schematic, output_file: str, lib_symbols_sexp=None, other_elements=None):
     """회로도를 KiCad 파일로 export"""
     print(f"Exporting to KiCad schematic: {output_file}")
     
@@ -63,6 +69,11 @@ def export_to_kicad(schematic, output_file: str, lib_symbols_sexp=None):
     if lib_symbols_sexp:
         print("  Inserting custom lib_symbols...")
         insert_lib_symbols(output_file, lib_symbols_sexp)
+    
+    # other_elements가 있으면 KiCad 파일에 삽입
+    if other_elements:
+        print(f"  Inserting {len(other_elements)} other elements...")
+        insert_other_elements(output_file, other_elements)
     
     print(f"✅ Successfully exported to: {output_file}")
 
@@ -90,6 +101,51 @@ def insert_lib_symbols(kicad_file: str, lib_symbols_sexp: str):
         else:
             # lib_symbols가 없으면 추가 (kicad_sch 다음에)
             sexp_data.insert(7, custom_lib_symbols)  # paper 다음 위치
+    
+    # 다시 S-expression 문자열로 변환
+    new_content = sexpdata.dumps(sexp_data)
+    
+    # 파일에 쓰기
+    with open(kicad_file, 'w', encoding='utf-8') as f:
+        f.write(new_content)
+
+
+def insert_other_elements(kicad_file: str, other_elements: list):
+    """KiCad 파일에 other elements (bus, no_connect, etc.) 삽입"""
+    # KiCad 파일 읽기
+    with open(kicad_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # S-expression 파싱
+    sexp_data = sexpdata.loads(content)
+    
+    # other_elements를 S-expression으로 파싱하여 삽입
+    if isinstance(sexp_data, list):
+        # lib_symbols 뒤에 삽입 (또는 적절한 위치 찾기)
+        insert_index = None
+        for i, item in enumerate(sexp_data):
+            if isinstance(item, list) and len(item) > 0:
+                if isinstance(item[0], sexpdata.Symbol) and str(item[0]) == 'lib_symbols':
+                    insert_index = i + 1
+                    break
+        
+        if insert_index is None:
+            # lib_symbols를 못 찾으면 paper 다음에 삽입
+            for i, item in enumerate(sexp_data):
+                if isinstance(item, list) and len(item) > 0:
+                    if isinstance(item[0], sexpdata.Symbol) and str(item[0]) == 'paper':
+                        insert_index = i + 1
+                        break
+        
+        if insert_index is not None:
+            # 각 other_element를 파싱해서 삽입
+            for elem_sexp_str in other_elements:
+                try:
+                    elem = sexpdata.loads(elem_sexp_str.strip())
+                    sexp_data.insert(insert_index, elem)
+                    insert_index += 1
+                except Exception as e:
+                    print(f"  Warning: Failed to parse other element: {e}")
     
     # 다시 S-expression 문자열로 변환
     new_content = sexpdata.dumps(sexp_data)
@@ -222,10 +278,10 @@ def main():
     
     try:
         # Python 코드에서 회로도 로드
-        schematic, lib_symbols_sexp = load_circuit_from_file(str(python_path))
+        schematic, lib_symbols_sexp, other_elements = load_circuit_from_file(str(python_path))
         
         # KiCad 파일로 export
-        export_to_kicad(schematic, str(output_path), lib_symbols_sexp)
+        export_to_kicad(schematic, str(output_path), lib_symbols_sexp, other_elements)
         
         print("\n다음 단계:")
         print(f"1. KiCad에서 {output_path} 파일을 열어서 확인")

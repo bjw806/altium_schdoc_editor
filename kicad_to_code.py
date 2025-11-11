@@ -155,6 +155,7 @@ def extract_junctions_from_sexp(sexp_data):
 def extract_labels_from_sexp(sexp_data):
     """S-expression에서 라벨 추출"""
     labels = []
+    empty_labels = []
     
     def traverse(node):
         if isinstance(node, list) and len(node) > 0:
@@ -173,6 +174,12 @@ def extract_labels_from_sexp(sexp_data):
                             label_data['uuid'] = str(item[1])
                 
                 if 'text' in label_data and 'position' in label_data:
+                    # 빈 라벨 감지
+                    if not label_data['text'] or label_data['text'].strip() == '':
+                        empty_labels.append({
+                            'position': label_data['position'],
+                            'uuid': label_data.get('uuid', 'unknown')
+                        })
                     labels.append(label_data)
             
             # 재귀적으로 탐색
@@ -181,7 +188,7 @@ def extract_labels_from_sexp(sexp_data):
                     traverse(item)
     
     traverse(sexp_data)
-    return labels
+    return labels, empty_labels
 
 
 def extract_lib_symbols_sexp(sexp_data):
@@ -197,6 +204,36 @@ def extract_lib_symbols_sexp(sexp_data):
                 return sexpdata.dumps(item, pretty_print=True, indent_as='    ')
 
     return None
+
+
+def extract_other_elements_sexp(sexp_data):
+    """
+    kicad-sch-api로 처리되지 않는 요소들을 raw S-expression으로 추출
+    - bus
+    - bus_entry
+    - bus_alias  
+    - no_connect
+    - hierarchical_label
+    - title_block (metadata)
+    """
+    other_elements = []
+    element_types = ['bus', 'bus_entry', 'bus_alias', 'no_connect', 'hierarchical_label', 'title_block']
+    
+    if not isinstance(sexp_data, list):
+        return []
+    
+    for item in sexp_data:
+        if isinstance(item, list) and item:
+            head = item[0]
+            if isinstance(head, sexpdata.Symbol) and str(head) in element_types:
+                # S-expression을 문자열로 변환하여 보존
+                sexp_str = sexpdata.dumps(item, pretty_print=True, indent_as='  ')
+                other_elements.append({
+                    'type': str(head),
+                    'sexp': sexp_str
+                })
+    
+    return other_elements
 
 
 def generate_component_code(comp: dict) -> str:
@@ -283,6 +320,16 @@ def convert_kicad_to_code(input_file: str, output_file: str):
     # lib_symbols 블록은 커스텀 심볼 복원을 위해 그대로 보존
     lib_symbols_sexp = extract_lib_symbols_sexp(sexp_data)
     
+    # 기타 처리되지 않는 요소들도 보존
+    print("Extracting other elements (bus, no_connect, etc.)...")
+    other_elements = extract_other_elements_sexp(sexp_data)
+    if other_elements:
+        element_types = {}
+        for elem in other_elements:
+            elem_type = elem['type']
+            element_types[elem_type] = element_types.get(elem_type, 0) + 1
+        print(f"  Found: {', '.join(f'{count} {etype}' for etype, count in element_types.items())}")
+    
     # 모든 요소 추출
     print("Extracting components...")
     components = extract_components_from_sexp(sexp_data)
@@ -323,8 +370,17 @@ def convert_kicad_to_code(input_file: str, output_file: str):
     print(f"  Found {len(junctions)} junctions")
     
     print("Extracting labels...")
-    labels = extract_labels_from_sexp(sexp_data)
+    labels, empty_labels = extract_labels_from_sexp(sexp_data)
     print(f"  Found {len(labels)} labels")
+    
+    # 빈 라벨 경고
+    if empty_labels:
+        print(f"\n⚠️  WARNING: Found {len(empty_labels)} empty label(s):")
+        for idx, empty_label in enumerate(empty_labels, 1):
+            pos = empty_label['position']
+            uuid = empty_label['uuid']
+            print(f"    {idx}. Position: ({pos[0]:.4f}, {pos[1]:.4f}), UUID: {uuid}")
+        print("    Note: Empty labels will be skipped during conversion (kicad-sch-api limitation)\n")
     
     # Python 코드 생성
     COMPONENT_VAR_COUNTER.clear()
@@ -349,6 +405,18 @@ def convert_kicad_to_code(input_file: str, output_file: str):
         code_lines.append('LIB_SYMBOLS_SEXP = """')
         code_lines.extend(lib_symbols_sexp.splitlines())
         code_lines.append('"""')
+        code_lines.append('')
+
+    if other_elements:
+        code_lines.append('# Other KiCad elements (bus, no_connect, etc.) preserved as S-expressions')
+        code_lines.append('OTHER_ELEMENTS = [')
+        for elem in other_elements:
+            # Python 문자열로 escape
+            sexp_lines = elem['sexp'].split('\n')
+            code_lines.append('    """')
+            code_lines.extend(['    ' + line for line in sexp_lines])
+            code_lines.append('    """,')
+        code_lines.append(']')
         code_lines.append('')
 
     code_lines.append('')
@@ -433,8 +501,10 @@ def convert_kicad_to_code(input_file: str, output_file: str):
         code_lines.append('    # Add labels')
         for label in labels:
             text = label['text']
-            # 빈 라벨은 제외
+            # kicad-sch-api는 빈 라벨을 허용하지 않으므로 제외
+            # TODO: 원본 파일과 완전히 일치시키려면 다른 방법 필요
             if not text or text.strip() == '':
+                code_lines.append(f'    # Skipped empty label at position {label.get("position")}')
                 continue
             pos = label['position']
             if len(pos) == 2:
